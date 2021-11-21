@@ -35,7 +35,7 @@ fn main() -> std::io::Result<()> {
 
     let comparisons = [
         (180, "🎧", "play an MP3 song"),
-        (448, "🪅", "destroy a piñata"),
+        (448, "🪅", "crack a piñata"),
         (5_100, "💡", "power an LED for 10 minutes"),
         (29_000, "📱", "charge a phone"),
         (67_500, "🍞", "toast a toast"),

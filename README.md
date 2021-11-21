@@ -8,5 +8,5 @@ For now, it only contains a Rust program that shows you your current and cumulat
 ```text
 Current energy use: 7.48 joules.
 Since program start: 457.2 joules.
-With this energy, you could destroy a piñata. 🪅
+With this energy, you could crack a piñata. 🪅
 ```
