@@ -51,6 +51,25 @@ fn main() -> std::io::Result<()> {
         (5_400_000, "🎂", "bake a cake"),
         (10_800_000, "🍪", "bake cookies"),
         (248_000_000, "🏠", "power an average house for 1 day"),
+        (
+            14_000_000_000_000_000_000_000_000_000_000,
+            "🌅",
+            "Run the sun for 1 hour",
+        ),
+        // Emojis for other things that might be interesting:
+        // 💣 Bomb
+        // 💎 Gem Stone
+        // 📻 Radio
+        // 🔦 Flashlight
+        // 🗽 Statue of Liberty
+        // 🚂 Locomotive
+        // ✈️️ Airplane
+        // 🚢 Ship
+        // 🚁 Helicopter
+        // 🚀 Rocket
+        // 🏊 Person Swimming
+        // 🏋️ Person Lifting Weights
+        // 🚴 Person Biking
     ];
     let mut total_joules = 0.0;
     for joules in joules_stream {
@@ -70,74 +89,6 @@ fn main() -> std::io::Result<()> {
         }
         println!();
     }
-
-    // 💣 Bomb
-    // 💎 Gem Stone
-    // 📻 Radio
-    // 🔦 Flashlight
-    // 🗽 Statue of Liberty
-    // 🚂 Locomotive
-    // ✈️️ Airplane
-    // 🚢 Ship
-    // 🚁 Helicopter
-    // 🚀 Rocket
-    // 🏊 Person Swimming
-    // 🏋️ Person Lifting Weights
-    // 🚴 Person Biking
-    // 14_000_000_000_000_000_000_000_000_000_000: ☀️ Run the sun for 1 hour
-
-    // let perf_output = Command::new("sudo")
-    //     .args([
-    //         "perf",
-    //         "stat",
-    //         "-I",
-    //         "1000",
-    //         "-e",
-    //         "power/energy-pkg/",
-    //         "-a",
-    //     ])
-    //     .stdout(Stdio::piped())
-    //     .spawn()
-    //     .unwrap()
-    //     .stdout
-    //     .unwrap();
-    // let perf_output = BufReader::new(perf_output);
-    // perf_output.lines().for_each(|line| {
-    //     println!("Read a line!");
-    //     println!("Read: {:?}", line.unwrap());
-    // });
-
-    // {
-    //     let stdout = perf.stdout.as_mut().unwrap();
-    //     let stdout_reader = BufReader::new(stdout);
-    //     let stdout_lines = stdout_reader.lines();
-
-    //     println!("Reading stdout lines");
-    //     for line in stdout_lines {
-    //         println!("Read a line!");
-    //         println!("Read: {:?}", line);
-    //     }
-    // }
-
-    // println!("Waiting for perf");
-    // perf.wait().unwrap();
-
-    // let perf = Command::new("sudo")
-    //     .args([
-    //         "perf",
-    //         "stat",
-    //         "-I",
-    //         "1000",
-    //         "-e",
-    //         "power/energy-pkg/",
-    //         "-a",
-    //     ])
-    //     .spawn()
-    //     .unwrap();
-    // let stdout = BufReader::new(perf.stdout.unwrap());
-    // for line in stdout.lines() {
-    //     println!("{}", line.unwrap());
-    // }
 
     Ok(())
 }
