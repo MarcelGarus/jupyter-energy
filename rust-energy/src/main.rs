@@ -1,11 +1,5 @@
 use duct::cmd;
-use std::array::IntoIter;
-use std::collections::HashMap;
-use std::io::prelude::*;
-use std::{
-    io::{BufRead, BufReader},
-    process::{Command, Stdio},
-};
+use std::io::{BufRead, BufReader};
 
 fn main() -> std::io::Result<()> {
     let big_cmd = cmd!(
@@ -34,25 +28,25 @@ fn main() -> std::io::Result<()> {
         });
 
     let comparisons = [
-        (180, "🎧", "play an MP3 song"),
-        (448, "🪅", "crack a piñata"),
-        (5_100, "💡", "power an LED for 10 minutes"),
-        (29_000, "📱", "charge a phone"),
-        (67_500, "🍞", "toast a toast"),
-        (82_500, "🫖", "brew a cup of coffee"),
-        (108_000, "📺", "run a TV for 1 hour"),
-        (110_000, "🎢", "ride a roller coaster"),
-        (143_000, "📧", "send an email"),
-        (180_000, "💻", "run a laptop for 1 hour"),
-        (360_000, "🎮", "play video games for 1 hour"),
-        (564_000, "🫖", "brew a cup of tea"),
-        (1_250_000, "🧱", "break through a brick"),
-        (3_400_000, "🍕", "bake a pizza"),
-        (5_400_000, "🎂", "bake a cake"),
-        (10_800_000, "🍪", "bake cookies"),
-        (248_000_000, "🏠", "power an average house for 1 day"),
+        (180.0, "🎧", "play an MP3 song"),
+        (448.0, "🪅", "crack a piñata"),
+        (5_100.0, "💡", "power an LED for 10 minutes"),
+        (29_000.0, "📱", "charge a phone"),
+        (67_500.0, "🍞", "toast a toast"),
+        (82_500.0, "🫖", "brew a cup of coffee"),
+        (108_000.0, "📺", "run a TV for 1 hour"),
+        (110_000.0, "🎢", "ride a roller coaster"),
+        (143_000.0, "📧", "send an email"),
+        (180_000.0, "💻", "run a laptop for 1 hour"),
+        (360_000.0, "🎮", "play video games for 1 hour"),
+        (564_000.0, "🫖", "brew a cup of tea"),
+        (1_250_000.0, "🧱", "break through a brick"),
+        (3_400_000.0, "🍕", "bake a pizza"),
+        (5_400_000.0, "🎂", "bake a cake"),
+        (10_800_000.0, "🍪", "bake cookies"),
+        (248_000_000.0, "🏠", "power an average house for 1 day"),
         (
-            14_000_000_000_000_000_000_000_000_000_000,
+            14_000_000_000_000_000_000_000_000_000_000.0,
             "🌅",
             "Run the sun for 1 hour",
         ),
