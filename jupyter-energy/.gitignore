@@ -1,0 +1,45 @@
+.DS_Store
+
+### Python ###
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+*.ipynb
+MANIFEST
+jupyter_energy.egg-info
+
+# IDE and code editors
+*.iml
+.idea
+.vscode
+*.code-workspace
+.history
+
+# Labextension
+*.bundle.*
+lib/
+node_modules/
+*.egg-info/
+.ipynb_checkpoints
+*.tsbuildinfo
+jupyter_energy/labextension
+yarn-error.log
