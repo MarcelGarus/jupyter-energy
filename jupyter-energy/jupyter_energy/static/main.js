@@ -4,22 +4,24 @@ define([
 ], function ($, utils) {
     function setupDOM() {
         $('#maintoolbar-container').append(
-            $('<div>').attr('id', 'jupyter-energy-display')
+            $('<div>').attr('id', 'jupyter-energy')
                 .addClass('btn-group')
                 .addClass('pull-right')
-                .append(
-                    $('<strong>').text('Energy: ')
-                ).append(
-                    $('<span>').attr('id', 'jupyter-energy-current')
-                        .attr('title', 'Actively used energy (updates every second)')
+                .append($('<span>').text('Now: '))
+                .append($('<strong>')
+                    .attr('id', 'jupyter-energy-current')
+                    .attr('title', 'Actively used energy per second')
                 )
+                .append($('<span>').text('Total: ').attr('style', 'padding-left: 1em;'))
+                .append($('<strong>')
+                    .attr('id', 'jupyter-energy-total')
+                    .attr('title', 'Energy usage since this notebook started'))
         );
-        // FIXME: Do something cleaner to get styles in here?
         $('head').append(
             $('<style>').html('.jupyter-energy-warn { background-color: #FFD2D2; color: #D8000C; }')
         );
         $('head').append(
-            $('<style>').html('#jupyter-energy-display { padding: 2px 8px; }')
+            $('<style>').html('#jupyter-energy { padding: 2px 8px; }')
         );
     }
 
@@ -34,11 +36,18 @@ define([
             return;
         }
         $.getJSON({
-            url: utils.get_body_data('baseUrl') + 'api/metrics/v1',
+            url: utils.get_body_data('baseUrl') + 'api/energy-metrics/v1',
             success: function (data) {
                 console.log(data);
                 let joulesPerSecond = data['joulesPerSecond'];
-                $('#jupyter-energy-current').text(joulesPerSecond + " joules");
+                let joulesSinceStart = data['joulesSinceStart'];
+
+                $('#jupyter-energy-current')
+                    .text(joulesPerSecond + ' J/s')
+                    .attr('You are currently using ' + joulesPerSecond + ' joules per second.');
+                $('#jupyter-energy-total')
+                    .text(joulesSinceStart + ' J 🪅')
+                    .attr(joulesSinceStart + ' joules are enough energy to crack open a pinata.');
 
                 // totalMemoryUsage = humanFileSize(data['rss']);
 
@@ -51,9 +60,9 @@ define([
                 //         display += " / " + maxMemoryUsage
                 //     }
                 //     if (limits['memory']['warn']) {
-                //         $('#jupyter-energy-display').addClass('jupyter-energy-warn');
+                //         $('#jupyter-energy').addClass('jupyter-energy-warn');
                 //     } else {
-                //         $('#jupyter-energy-display').removeClass('jupyter-energy-warn');
+                //         $('#jupyter-energy').removeClass('jupyter-energy-warn');
                 //     }
                 // }
 

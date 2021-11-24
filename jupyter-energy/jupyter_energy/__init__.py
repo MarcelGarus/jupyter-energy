@@ -49,7 +49,7 @@ def _load_jupyter_server_extension(server_app):
     base_url = server_app.web_app.settings["base_url"]
 
     server_app.web_app.add_handlers(
-        ".*", [(url_path_join(base_url, "/api/metrics/v1"), ApiHandler)]
+        ".*", [(url_path_join(base_url, "/api/energy-metrics/v1"), ApiHandler)]
     )
 
     callback = ioloop.PeriodicCallback(
