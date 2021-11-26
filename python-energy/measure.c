@@ -33,7 +33,6 @@
 /// Ownership: Borrows the path. Gives the caller ownership of the content.
 char *_read_stripped_file(char *path)
 {
-    printf("_read_stripped_file(%s)\n", path);
     FILE *file = fopen(path, "rb");
     if (!file)
         return 0;
@@ -98,12 +97,10 @@ typedef struct EnergyRecordingHandle
 /// Ownership: Borrows input. Gives caller ownership of returned handle.
 EnergyRecordingHandle *start_recording_energy(char *event)
 {
-    printf("start_recording_energy(%s)\n", event);
     char *base_path = "/sys/bus/event_source/devices/power/events/";
 
     // Determine the power type.
     char *power_type_str = _read_stripped_file("/sys/bus/event_source/devices/power/type");
-    printf("power_type_str = %s\n", power_type_str);
     if (power_type_str == 0)
         return (EnergyRecordingHandle *)ERR_CANNOT_ACCESS_POWER_MEASUREMENT;
     long power_type = strtol(power_type_str, NULL, 10);
@@ -111,7 +108,6 @@ EnergyRecordingHandle *start_recording_energy(char *event)
 
     // Make sure the energy is measured in joules.
     char *unit = _read_stripped_file(_concat_strings(base_path, event, ".unit"));
-    printf("unit = %s\n", unit);
     if (unit == 0)
         return (EnergyRecordingHandle *)ERR_EVENT_NOT_SUPPORTED;
     if (0 != strcmp(unit, "Joules"))
@@ -120,17 +116,14 @@ EnergyRecordingHandle *start_recording_energy(char *event)
 
     // Determine the scale (joules per tick).
     char *scale = _read_stripped_file(_concat_strings(base_path, event, ".scale"));
-    printf("scale = %s\n", scale);
     if (scale == 0)
         return (EnergyRecordingHandle *)ERR_EVENT_NOT_SUPPORTED;
     double joules_per_tick = strtod(scale, NULL);
-    printf("scale = %0.20f\n", joules_per_tick);
     free(scale);
 
     // Determine the energy config of the event. For example, "energy-pkg" and
     // "energy-cpu" have different configs.
     char *event_config_str = _read_stripped_file(_concat_strings(base_path, event, ""));
-    printf("event_config_str = %s\n", event_config_str);
     if (event_config_str == 0)
         return (EnergyRecordingHandle *)ERR_EVENT_NOT_SUPPORTED;
     char *prefix = "event=0x";
@@ -194,8 +187,8 @@ ENERGY_IN_JOULES energy_recording_state_in_joules(EnergyRecordingHandle *handle)
         return ERR_COULDNT_READ_CONSUMED_ENERGY;
 
     long int ticks_since_handle_creation = current_ticks - handle->ticks_at_creation;
-    double joules_since_creation = handle->joules_per_tick * (ENERGY_IN_JOULES)ticks_since_handle_creation;
-    return (ENERGY_IN_JOULES)joules_since_creation;
+    ENERGY_IN_JOULES joules_since_creation = handle->joules_per_tick * (ENERGY_IN_JOULES)ticks_since_handle_creation;
+    return joules_since_creation;
 }
 
 /// Closes the given handle.
@@ -218,9 +211,7 @@ int stop_recording_energy(EnergyRecordingHandle *handle)
 
 void main()
 {
-    printf("Hello, world!\n");
-    double d = strtod("2.3283064365386962890625e-4", NULL);
-    printf("Parsed double d = %0.20f\n", d);
+    printf("Hello, world! Measuring your energy consumption...\n");
 
     EnergyRecordingHandle *handle = start_recording_energy("energy-pkg");
     if (handle < 0)
@@ -230,13 +221,13 @@ void main()
     }
     printf("Successfully created handle.\n");
 
-    while (true)
+    for (int i = 0; i < 3; i++)
     {
         sleep(1);
         double joules_since_start = energy_recording_state_in_joules(handle);
         printf("Since this program started, your PC used %0.3f joules.\n", joules_since_start);
     }
 
-    // Note: We never get here.
     stop_recording_energy(handle); // Invalidates the handle.
+    printf("Recording stopped.\n");
 }
