@@ -2,9 +2,12 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 
 import psutil
+import requests as req
 from jupyter_server.base.handlers import APIHandler
 from tornado import web
 from tornado.concurrent import run_on_executor
+
+from .measure import OngoingEnergyRecording, record_energy
 
 try:
     # Traitlets >= 4.3.3
@@ -15,6 +18,7 @@ except ImportError:
 
 class ApiHandler(APIHandler):
     executor = ThreadPoolExecutor(max_workers=5)
+    ongoing_recording = record_energy("energy-pkg")
 
     @web.authenticated
     async def get(self):
@@ -23,7 +27,11 @@ class ApiHandler(APIHandler):
         """
         config = self.settings["jupyter_energy_config"]
         print(f"Config: {config}")
-        self.write(json.dumps({"joulesPerSecond": 2, "joulesSinceStart": 123}))
+        print(f"Ongoing recording: {self.ongoing_recording}")
+        # self.ongoing_recording.used_joules()
+        response = req.get('http://localhost:35396')
+        print(response)
+        self.write(response.text)
 
         # cur_process = psutil.Process()
         # all_processes = [cur_process] + cur_process.children(recursive=True)
