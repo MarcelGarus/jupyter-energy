@@ -51,3 +51,35 @@ Again, there are two ways to use the Python file:
 ## jupyter-energy
 
 This folder contains an extension for Jupyter Notebooks.
+
+### How to use
+
+1. Create an environment that will hold our dependencies:
+  ```bash
+  conda create -n jupyter-energy -c conda-forge python
+  ```
+2. Activate the virtual environment that pipenv created for us
+  ```bash
+  conda activate jupyter-energy
+  ```
+3. Do a dev install of jupyter-energy and its dependencies
+  ```bash
+  pip install --editable .[dev]
+  ```
+4. Enable the server extension:
+  ```bash
+  jupyter serverextension enable --py jupyter_energy --sys-prefix
+  ```
+  *Note: if you're using Jupyter Server:*
+  ```bash
+  jupyter server extension enable --py jupyter_energy --sys-prefix
+  ```
+5. Install and enable the nbextension for use with Jupyter Classic Notebook.
+  ```bash
+  jupyter nbextension install --py jupyter_energy --symlink --sys-prefix
+  jupyter nbextension enable --py jupyter_energy --sys-prefix
+  ```
+6. Start a Jupyter Notebook instance, open a new notebook and check out the memory usage in the top right!
+  ```bash
+  jupyter notebook
+  ```
