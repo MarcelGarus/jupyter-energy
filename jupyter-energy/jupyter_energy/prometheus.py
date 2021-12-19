@@ -17,7 +17,8 @@ class PrometheusHandler(Callable):
         self.config = metricsloader.config
         self.session_manager = metricsloader.server_app.session_manager
 
-        gauge_names = ["total_memory", "max_memory", "total_cpu", "max_cpu"]
+        # gauge_names = ["total_memory", "max_memory", "total_cpu", "max_cpu"]
+        gauge_names = []
         for name in gauge_names:
             phrase = name + "_usage"
             gauge = Gauge(phrase, "counter for " + phrase.replace("_", " "), [])
