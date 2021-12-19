@@ -44,6 +44,7 @@ def _load_jupyter_server_extension(server_app):
     """
     Called during notebook start
     """
+    print("A notebook started and the extension is loaded.")
     resuseconfig = ResourceUseDisplay(parent=server_app)
     server_app.web_app.settings["jupyter_energy_config"] = resuseconfig
     base_url = server_app.web_app.settings["base_url"]
