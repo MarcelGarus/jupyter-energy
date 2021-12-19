@@ -25,9 +25,10 @@ define([
         );
     }
 
-    function humanFileSize(size) {
-        var i = Math.floor(Math.log(size) / Math.log(1024));
-        return (size / Math.pow(1024, i)).toFixed(1) * 1 + ' ' + ['B', 'kB', 'MB', 'GB', 'TB'][i];
+    function humanEnergy(size) {
+        const units = ['J', 'KiJ', 'MiJ', 'GiJ', 'TiJ'];
+        var i = Math.min(units.length - 1, Math.floor(Math.log(size) / Math.log(1024)));
+        return (size / Math.pow(1024, i)).toFixed(1) * 1 + ' ' + units[i];
     }
 
     var displayMetrics = function () {
@@ -39,34 +40,21 @@ define([
             url: utils.get_body_data('baseUrl') + 'api/energy-metrics/v1',
             success: function (data) {
                 console.log(data);
-                let joulesPerSecond = data['joulesPerSecond'];
-                let joulesSinceStart = data['joulesSinceStart'];
+                let joulesUsedByAllPerSecond = '?';
+                let joulesUsedByAllSinceStart = data['joulesUsedByAll'];
 
                 $('#jupyter-energy-current')
-                    .text(joulesPerSecond + ' J/s')
-                    .attr('You are currently using ' + joulesPerSecond + ' joules per second.');
+                    .text(humanEnergy(joulesUsedByAllPerSecond) + ' J/s')
+                    .attr('You are currently using ' + humanEnergy(joulesUsedByAllPerSecond) + ' joules per second.');
                 $('#jupyter-energy-total')
-                    .text(joulesSinceStart + ' J 🪅')
-                    .attr(joulesSinceStart + ' joules are enough energy to crack open a pinata.');
+                    .text(humanEnergy(joulesUsedByAllSinceStart) + ' J 🪅')
+                    .attr(humanEnergy(joulesUsedByAllSinceStart) + ' joules are enough energy to crack open a pinata.');
 
-                // totalMemoryUsage = humanFileSize(data['rss']);
-
-                // var limits = data['limits'];
-                // var display = totalMemoryUsage;
-
-                // if (limits['memory']) {
-                //     if (limits['memory']['rss']) {
-                //         maxMemoryUsage = humanFileSize(limits['memory']['rss']);
-                //         display += " / " + maxMemoryUsage
-                //     }
-                //     if (limits['memory']['warn']) {
-                //         $('#jupyter-energy').addClass('jupyter-energy-warn');
-                //     } else {
-                //         $('#jupyter-energy').removeClass('jupyter-energy-warn');
-                //     }
+                // if (limits['memory']['warn']) {
+                //     $('#jupyter-energy').addClass('jupyter-energy-warn');
+                // } else {
+                //     $('#jupyter-energy').removeClass('jupyter-energy-warn');
                 // }
-
-                // $('#jupyter-energy-current').text(display);
             }
         });
     };
