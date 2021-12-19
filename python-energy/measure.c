@@ -36,15 +36,12 @@ char *_read_stripped_file(char *path)
     FILE *file = fopen(path, "rb");
     if (!file)
         return 0;
-
-    fseek(file, 0, SEEK_END);
-    long length = ftell(file);
-    fseek(file, 0, SEEK_SET);
-    char *buffer = malloc(length);
+    char *buffer = malloc(1024);
     if (!buffer)
         return 0;
-    fread(buffer, 1, length, file);
+    size_t length = fread(buffer, 1, 1024, file);
     fclose(file);
+    buffer[length] = '\0';
     while (buffer[strlen(buffer) - 1] == '\n' || buffer[strlen(buffer) - 1] == ' ')
     {
         buffer[strlen(buffer) - 1] = '\0';
@@ -111,7 +108,10 @@ EnergyRecordingHandle *start_recording_energy(char *event)
     if (unit == 0)
         return (EnergyRecordingHandle *)ERR_EVENT_NOT_SUPPORTED;
     if (0 != strcmp(unit, "Joules"))
+    {
+        printf("Unknown unit \"%s\".\n", unit);
         return (EnergyRecordingHandle *)ERR_UNKNOWN_UNIT;
+    }
     free(unit);
 
     // Determine the scale (joules per tick).
