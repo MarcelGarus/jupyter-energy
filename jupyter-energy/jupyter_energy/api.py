@@ -16,6 +16,6 @@ class ApiHandler(APIHandler):
         config = self.settings["jupyter_energy_config"]
         # print(f"Config: {config}")
         response = req.get('http://localhost:35396')
-        print(response.text)
+        print(response.text.strip())
         self.write(response.text)
         # self.write(json.dumps(metrics))
