@@ -29,7 +29,8 @@ define([
             const joulesByGpu = measurements['joulesUsedByGpu'] - (startMeasurements['joulesUsedByGpu'] ?? 0);
             const joulesUsedSinceLastMeasurement = measurements['joulesUsedByAll'] - previousMeasurements['joulesUsedByAll'];
             const secondsSinceLastMeasurement = (now - previousTimestamp) / 1000.0;
-            const normalizedJoulesInLastSecond = secondsSinceLastMeasurement == 0 ? 0 : joulesUsedSinceLastMeasurement / secondsSinceLastMeasurement;
+            const normalizedJoulesInLastSecond = secondsSinceLastMeasurement == 0 ?
+                0 : joulesUsedSinceLastMeasurement / secondsSinceLastMeasurement;
 
             previousMeasurements = measurements;
             previousTimestamp = now;
@@ -43,6 +44,18 @@ define([
                 comparisonEmoji: '🪅',
             });
         });
+    }
+
+    function resetValues() {
+        initData();
+        displayMetrics();
+    }
+
+    let useWatt = false;
+
+    function toggleUnit() {
+        useWatt = !useWatt;
+        displayMetrics();
     }
 
     function setupDOM() {
@@ -81,36 +94,41 @@ define([
             $('<div>').attr('id', 'je-menu')
                 .append($('<div>')
                     .addClass('je-menu-section')
+                    .attr('style', 'min-height: 3em;')
                     .append($('<div>').attr('id', 'je-menu-comparison-emoji'))
                     .append($('<span>').text('Your computer used '))
                     .append($('<strong>').text('…').attr('id', 'je-menu-metric-total'))
                     .append($('<span>').text(' since you opened this notebook. This is enough energy to '))
                     .append($('<strong>').text('…').attr('id', 'je-menu-comparison-text'))
-                    .append($('<span>').text('.'))
-                )
+                    .append($('<span>').text('.')))
+                .append($('<div>')
+                    .addClass('je-menu-section')
+                    .append($('<span>').text('Total: '))
+                    .append($('<strong>').text('…').attr('id', 'je-menu-metric-total-2'))
+                    .append($('<span>').text('CPU: ').attr('style', 'padding-left: 1em;'))
+                    .append($('<strong>').text('…').attr('id', 'je-menu-metric-cpu'))
+                    .append($('<span>').text('RAM: ').attr('style', 'padding-left: 1em;'))
+                    .append($('<strong>').text('…').attr('id', 'je-menu-metric-ram'))
+                    .append($('<span>').text('GPU: ').attr('style', 'padding-left: 1em;'))
+                    .append($('<strong>').text('…').attr('id', 'je-menu-metric-gpu')))
                 .append($('<div>').addClass('je-menu-section').text('[TODO: Graph]'))
                 .append($('<div>')
                     .addClass('je-menu-section')
-                    .append($('<span>').text('Energy usage since notebook start by multiple components: '))
-                    .append($('<span>').text('CPU: ').attr('style', 'padding-left: 1em;'))
-                    .append($('<strong>')
-                        .text('…')
-                        .attr('id', 'je-menu-metric-cpu')
-                        .attr('title', 'CPU usage since this notebook started'))
-                    .append($('<span>').text('RAM: ').attr('style', 'padding-left: 1em;'))
-                    .append($('<strong>')
-                        .text('…')
-                        .attr('id', 'je-menu-metric-ram')
-                        .attr('title', 'RAM usage since this notebook started'))
-                    .append($('<span>').text('GPU: ').attr('style', 'padding-left: 1em;'))
-                    .append($('<strong>')
-                        .text('…')
-                        .attr('id', 'je-menu-metric-gpu')
-                        .attr('title', 'GPU usage since this notebook started'))
-                )
-                .append($('<div>').addClass('je-menu-section').text('[TODO: Switch between J and kWh]'))
-                .append($('<div>').addClass('je-menu-section').text('[TODO: Reset values]'))
-                .append($('<div>').addClass('je-menu-section').text('[TODO: Footer]'))
+                    .append($('<button>')
+                        .addClass('btn').addClass('btn-default')
+                        .text('Switch units between J and Wh')
+                        .click((_) => toggleUnit()))
+                    .append($('<button>')
+                        .addClass('btn').addClass('btn-default')
+                        .attr('style', 'margin-left: 1em;')
+                        .text('Reset values')
+                        .click((_) => resetValues())))
+                .append($('<div>')
+                    .addClass('je-menu-section')
+                    .addClass('je-menu-footer')
+                    .text("The values also contain workload from other programs because there is " +
+                        "no reliable way for the operating system to attribute the energy usage " +
+                        "of PC components with the running processes."))
         );
         $('head').append($('<style>').html(`
             #je-menu {
@@ -133,30 +151,46 @@ define([
                 font-size: 3em;
                 margin-left: 0.5em;
             }
+            .je-menu-footer {
+                margin-bottom: 0;
+                font-size: 0.8em;
+                opacity: 0.6;
+            }
             #jupyter-resource-usage-display { display: none; }
         `));
     }
 
-    function humanEnergy(size) {
-        const units = ['J', 'KiJ', 'MiJ', 'GiJ', 'TiJ'];
-        let i = size == 0 ? 0 : Math.floor(Math.log(size) / Math.log(1024));
-        if (i < 0) i = 0;
-        if (i >= units.length) i = units.length - 1;
-        return (size / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+    function humanSiPrefixed(size) {
+        const smallPrefixes = ['', 'm', 'μ', 'n'];
+        const bigPrefixes = ['', 'K', 'M', 'G', 'T', 'P'];
+        let i = size == 0 ? 0 : Math.floor(Math.log(size) / Math.log(1000));
+        const prefix = (i >= 0) ? bigPrefixes[Math.min(i, bigPrefixes.length - 1)]
+            : smallPrefixes[Math.min(-i, smallPrefixes.length - 1)];
+        return (size / Math.pow(1000, i)).toFixed(1) + ' ' + prefix;
+    }
+    function humanEnergy(joules) {
+        if (useWatt) {
+            return humanSiPrefixed(joules / 3600.0) + 'Wh';
+        } else {
+            return humanSiPrefixed(joules) + 'J';
+        }
+    }
+    function humanPower(joulesPerSecond) {
+        return humanSiPrefixed(joulesPerSecond) + 'W';
     }
 
     function comparisonForJoules(joules) {
         const comparisons = [
             { joules: 0, emoji: '🕸️', text: 'do nothing interesting' },
             { joules: 6, emoji: '💡', text: 'power a modern lamp for one second' },
-            { joules: 12, emoji: '💡', text: 'power a modern lamp for two second' },
-            { joules: 18, emoji: '💡', text: 'power a modern lamp for three second' },
-            { joules: 24, emoji: '💡', text: 'power a modern lamp for four second' },
-            { joules: 30, emoji: '💡', text: 'power a modern lamp for five second' },
-            { joules: 36, emoji: '💡', text: 'power a modern lamp for six second' },
-            { joules: 42, emoji: '💡', text: 'power a modern lamp for seven second' },
-            { joules: 48, emoji: '💡', text: 'power a modern lamp for eight second' },
-            { joules: 54, emoji: '💡', text: 'power a modern lamp for nine second' },
+            { joules: 12, emoji: '💡', text: 'power a modern lamp for two seconds' },
+            { joules: 18, emoji: '💡', text: 'power a modern lamp for three seconds' },
+            { joules: 24, emoji: '💡', text: 'power a modern lamp for four seconds' },
+            { joules: 30, emoji: '💡', text: 'power a modern lamp for five seconds' },
+            { joules: 36, emoji: '💡', text: 'power a modern lamp for six seconds' },
+            { joules: 42, emoji: '💡', text: 'power a modern lamp for seven seconds' },
+            { joules: 48, emoji: '💡', text: 'power a modern lamp for eight seconds' },
+            { joules: 54, emoji: '💡', text: 'power a modern lamp for nine seconds' },
             { joules: 60, emoji: '🎧', text: 'play a one-minute MP3 song' },
             { joules: 120, emoji: '🎧', text: 'play a two-minute MP3 song' },
             { joules: 180, emoji: '🎧', text: 'play a three-minute MP3 song' },
@@ -166,7 +200,8 @@ define([
             { joules: 420, emoji: '🎧', text: 'play a seven-minute MP3 song' },
             { joules: 448, emoji: '🪅', text: 'crack a piñata' },
             { joules: 856, emoji: '🎬', text: 'run a movie-grade LED panel for a minute on full brightness' },
-            { joules: 1252, emoji: '🎹', text: 'play a four-minute song on an electric keyboard' },
+            { joules: 1250, emoji: '🎹', text: 'play a four-minute song on an electric keyboard' },
+            { joules: 2500, emoji: '🎹', text: 'play an eight-minute song on an electric keyboard' },
             // { joules: 29000, emoji: '📱', text: 'charge a phone' },
             { joules: 64337, emoji: '🐮', text: 'make a hot cup of milk in a milk frother' },
             { joules: 100000, emoji: '🍞', text: 'toast a toast' },
@@ -201,22 +236,17 @@ define([
             console.log(data);
             const comparison = comparisonForJoules(data.joulesUsedByAllSinceNotebookStart);
 
-            $('#je-toolbar-metric-current').text(humanEnergy(data.joulesUsedByAllInLastSecond) + '/s');
+            $('#je-toolbar-metric-current').text(humanPower(data.joulesUsedByAllInLastSecond));
             $('#je-toolbar-metric-total').text(humanEnergy(data.joulesUsedByAllSinceNotebookStart));
             $('#je-toolbar-comparison-emoji').text(comparison.emoji);
 
             $('#je-menu-metric-total').text(humanEnergy(data.joulesUsedByAllSinceNotebookStart));
             $('#je-menu-comparison-text').text(comparison.text);
             $('#je-menu-comparison-emoji').text(comparison.emoji);
-            $('#je-menu-metric-cpu')
-                .text(humanEnergy(data.joulesUsedByCpuSinceNotebookStart))
-                .attr('Since this notebook started, your CPU consumed ' + humanEnergy(data.joulesUsedByCpuSinceNotebookStart));
-            $('#je-menu-metric-ram')
-                .text(humanEnergy(data.joulesUsedByRamSinceNotebookStart))
-                .attr('Since this notebook started, your RAM consumed ' + humanEnergy(data.joulesUsedByRamSinceNotebookStart));
-            $('#je-menu-metric-gpu')
-                .text(humanEnergy(data.joulesUsedByGpuSinceNotebookStart))
-                .attr('Since this notebook started, your GPU consumed ' + humanEnergy(data.joulesUsedByGpuSinceNotebookStart));
+            $('#je-menu-metric-total-2').text(humanEnergy(data.joulesUsedByAllSinceNotebookStart));
+            $('#je-menu-metric-cpu').text(humanEnergy(data.joulesUsedByCpuSinceNotebookStart));
+            $('#je-menu-metric-ram').text(humanEnergy(data.joulesUsedByRamSinceNotebookStart));
+            $('#je-menu-metric-gpu').text(humanEnergy(data.joulesUsedByGpuSinceNotebookStart));
         });
     };
 
