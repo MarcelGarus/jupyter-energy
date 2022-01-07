@@ -2,47 +2,10 @@ define([
     'jquery',
     'base/js/utils'
 ], function ($, utils) {
-
-    let startMeasurements = {};
-    let previousMeasurements = {};
-    let previousTimestamp = 0;
-
-    function _getMeasurements(callback) {
+    function getMetrics(callback) {
         $.getJSON({
             url: utils.get_body_data('baseUrl') + 'api/energy-metrics/v1',
             success: callback
-        });
-    }
-    function initData() {
-        _getMeasurements((measurements) => {
-            startMeasurements = measurements;
-            previousMeasurements = measurements;
-            previousTimestamp = new Date().getTime();
-        });
-    }
-    function fetchData(callback) {
-        _getMeasurements((measurements) => {
-            const now = new Date().getTime();
-            const joulesByAll = measurements['joulesUsedByAll'] - (startMeasurements['joulesUsedByAll'] ?? 0);
-            const joulesByCpu = measurements['joulesUsedByCpu'] - (startMeasurements['joulesUsedByCpu'] ?? 0);
-            const joulesByRam = measurements['joulesUsedByRam'] - (startMeasurements['joulesUsedByRam'] ?? 0);
-            const joulesByGpu = measurements['joulesUsedByGpu'] - (startMeasurements['joulesUsedByGpu'] ?? 0);
-            const joulesUsedSinceLastMeasurement = measurements['joulesUsedByAll'] - previousMeasurements['joulesUsedByAll'];
-            const secondsSinceLastMeasurement = (now - previousTimestamp) / 1000.0;
-            const normalizedJoulesInLastSecond = secondsSinceLastMeasurement == 0 ?
-                0 : joulesUsedSinceLastMeasurement / secondsSinceLastMeasurement;
-
-            previousMeasurements = measurements;
-            previousTimestamp = now;
-            callback({
-                joulesUsedByAllSinceNotebookStart: joulesByAll,
-                joulesUsedByCpuSinceNotebookStart: joulesByCpu,
-                joulesUsedByRamSinceNotebookStart: joulesByRam,
-                joulesUsedByGpuSinceNotebookStart: joulesByGpu,
-                joulesUsedByAllInLastSecond: normalizedJoulesInLastSecond,
-                comparisonAction: 'crack a pinata',
-                comparisonEmoji: '🪅',
-            });
         });
     }
 
@@ -102,15 +65,9 @@ define([
                     .append($('<strong>').text('…').attr('id', 'je-menu-comparison-text'))
                     .append($('<span>').text('.')))
                 .append($('<div>')
+                    .attr('id', 'je-menu-graph')
                     .addClass('je-menu-section')
-                    .append($('<span>').text('Total: '))
-                    .append($('<strong>').text('…').attr('id', 'je-menu-metric-total-2'))
-                    .append($('<span>').text('CPU: ').attr('style', 'padding-left: 1em;'))
-                    .append($('<strong>').text('…').attr('id', 'je-menu-metric-cpu'))
-                    .append($('<span>').text('RAM: ').attr('style', 'padding-left: 1em;'))
-                    .append($('<strong>').text('…').attr('id', 'je-menu-metric-ram'))
-                    .append($('<span>').text('GPU: ').attr('style', 'padding-left: 1em;'))
-                    .append($('<strong>').text('…').attr('id', 'je-menu-metric-gpu')))
+                    .text('…'))
                 .append($('<div>').addClass('je-menu-section').text('[TODO: Graph]'))
                 .append($('<div>')
                     .addClass('je-menu-section')
@@ -224,7 +181,7 @@ define([
                 return comparison;
             }
         }
-        throw 'Shouldn\'t be reached.';
+        throw 'Shouldn\'t be reached. Joules: ' + joules;
     }
 
     function displayMetrics() {
@@ -232,27 +189,27 @@ define([
             // Don't poll when nobody is looking.
             return;
         }
-        fetchData(function (data) {
-            console.log(data);
-            const comparison = comparisonForJoules(data.joulesUsedByAllSinceNotebookStart);
+        getMetrics(function (metrics) {
+            console.log(metrics);
+            const comparison = comparisonForJoules(metrics.all.joules);
 
-            $('#je-toolbar-metric-current').text(humanPower(data.joulesUsedByAllInLastSecond));
-            $('#je-toolbar-metric-total').text(humanEnergy(data.joulesUsedByAllSinceNotebookStart));
+            $('#je-toolbar-metric-current').text(humanPower(metrics.all.watts));
+            $('#je-toolbar-metric-total').text(humanEnergy(metrics.all.joules));
             $('#je-toolbar-comparison-emoji').text(comparison.emoji);
 
-            $('#je-menu-metric-total').text(humanEnergy(data.joulesUsedByAllSinceNotebookStart));
+            $('#je-menu-metric-total').text(humanEnergy(metrics.all.joules));
             $('#je-menu-comparison-text').text(comparison.text);
             $('#je-menu-comparison-emoji').text(comparison.emoji);
-            $('#je-menu-metric-total-2').text(humanEnergy(data.joulesUsedByAllSinceNotebookStart));
-            $('#je-menu-metric-cpu').text(humanEnergy(data.joulesUsedByCpuSinceNotebookStart));
-            $('#je-menu-metric-ram').text(humanEnergy(data.joulesUsedByRamSinceNotebookStart));
-            $('#je-menu-metric-gpu').text(humanEnergy(data.joulesUsedByGpuSinceNotebookStart));
+
+            let graph = Object.values(metrics)
+                .map((source) => source.name + ': ' + humanEnergy(source.joules) + ' (' + humanPower(source.watts) + ')')
+                .join(' ');
+            $('#je-menu-graph').text(graph);
         });
     };
 
     return {
         load_ipython_extension: function () {
-            initData();
             setupDOM();
             displayMetrics();
             setInterval(displayMetrics, 1000);
