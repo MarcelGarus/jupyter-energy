@@ -1,6 +1,11 @@
+// import './main.js';
+// import 'https://cdn.jsdelivr.net/npm/chart.js';
+
+console.trace();
 define([
     'jquery',
-    'base/js/utils'
+    'base/js/utils',
+    'nbextensions/jupyter_energy/charts'
 ], function ($, utils) {
     function getMetrics(callback) {
         $.getJSON({
@@ -15,6 +20,7 @@ define([
     }
 
     let useWatt = false;
+    let chart = undefined;
 
     function toggleUnit() {
         useWatt = !useWatt;
@@ -39,6 +45,7 @@ define([
             }
         }
         // We use je as a prefix for jupyter-energy related stuff.
+        $('head').append($('<script>').attr('src', 'https://cdn.jsdelivr.net/npm/chart.js'));
         $('#maintoolbar-container').append(
             $('<button>').attr('id', 'je-toolbar')
                 .click((_) => toggleMenu())
@@ -65,10 +72,8 @@ define([
                     .append($('<strong>').text('…').attr('id', 'je-menu-comparison-text'))
                     .append($('<span>').text('.')))
                 .append($('<div>')
-                    .attr('id', 'je-menu-graph')
                     .addClass('je-menu-section')
-                    .text('…'))
-                .append($('<div>').addClass('je-menu-section').text('[TODO: Graph]'))
+                    .append($('<canvas>').attr('id', 'je-menu-chart')))
                 .append($('<div>')
                     .addClass('je-menu-section')
                     .append($('<button>')
@@ -201,10 +206,35 @@ define([
             $('#je-menu-comparison-text').text(comparison.text);
             $('#je-menu-comparison-emoji').text(comparison.emoji);
 
-            let graph = Object.values(metrics)
-                .map((source) => source.name + ': ' + humanEnergy(source.joules) + ' (' + humanPower(source.watts) + ')')
-                .join(' ');
-            $('#je-menu-graph').text(graph);
+            const timelineLength = Object.values(metrics)[0].wattsOverTime.length;
+            const labels = Array(timelineLength).fill().map((_, index) => '-' + (timelineLength - index) + 's');
+            const colors = ['#BD74E7', '#264653', '#2A9D8F', '#E9C46A', '#F4A261', '#E76F51'];
+
+            const data = { labels: labels, datasets: [] };
+            for (const source of Object.values(metrics)) {
+                // console.log('Source: ' + source);
+                const color = colors.pop();
+                data.datasets.push({
+                    label: source.name + ' (' + humanEnergy(source.joules) + ')',
+                    backgroundColor: color,
+                    borderColor: color,
+                    data: source.wattsOverTime,
+                    radius: 0,
+                });
+            }
+            if (chart == undefined) {
+                chart = new Chart(document.getElementById('je-menu-chart'), {
+                    type: 'line',
+                    data: data,
+                    options: {
+                        animation: { duration: 0 },
+                    },
+                });
+            } else {
+                chart.data = data;
+                chart.update();
+            }
+
         });
     };
 

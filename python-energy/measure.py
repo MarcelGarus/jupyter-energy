@@ -1,9 +1,13 @@
 #!/usr/bin/env python
 
 import ctypes
+import itertools
 import json
 import os.path as osp
+import time
+from collections import deque
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Thread
 
 HERE = osp.abspath(osp.dirname(__file__))
 
@@ -64,38 +68,70 @@ def record_energy(event_type: str):
     return OngoingEnergyRecording(event_type)
 
 
+# When started as a standalone program, we record the energy use.
+
 class Source:
     def __init__(self, id: str, name: str, recording: OngoingEnergyRecording):
         self.id = id
         self.name = name
         self.recording = recording
+        self.joules = 0
+        self.watts = 0
+        self.wattsOverTime = deque([])
 
 
-# When started as a standalone program, we record the energy use.
+sources = [
+    Source('all', 'all', record_energy('energy-pkg')),
+    Source('cpu', 'CPU', record_energy('energy-cores')),
+    Source('ram', 'RAM', record_energy('energy-ram')),
+    Source('gpu', 'Integrated GPU', record_energy('energy-gpu')),
+]
+running = True
+
+
+# Is called every second
+def tick():
+    print("ticking")
+    for source in sources:
+        joules = source.recording.used_joules()
+        source.watts = joules - source.joules
+        source.joules = joules
+        source.wattsOverTime.append(source.watts)
+        if len(source.wattsOverTime) > 100:
+            source.wattsOverTime.popleft()
+
+
+def monitor_energy_usage():
+    start_time = time.time()
+    interval = 1
+    for i in itertools.count():
+        if not running:
+            return
+        time.sleep(max(0, start_time + i*interval - time.time()))
+        tick()
+
 
 class MyServer(BaseHTTPRequestHandler):
-    sources = [
-        Source('all', 'all', record_energy('energy-pkg')),
-        Source('cpu', 'CPU', record_energy('energy-cores')),
-        Source('ram', 'RAM', record_energy('energy-ram')),
-        Source('gpu', 'Integrated GPU', record_energy('energy-gpu')),
-    ]
-
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-type', 'text/json')
         self.end_headers()
         response = {}
-        for source in self.sources:
+        for source in sources:
             response[source.id] = {
                 'name': source.name,
-                'joules': source.recording.used_joules(),
+                'joules': source.joules,
+                'watts': source.watts,
+                'wattsOverTime': list(source.wattsOverTime),
             }
         self.wfile.write(bytes(json.dumps(response), 'utf-8'))
         self.wfile.write(bytes('\n', 'utf-8'))
 
 
 if __name__ == '__main__':
+    t = Thread(target=monitor_energy_usage, args=())
+    t.start()
+
     webServer = HTTPServer(('localhost', 35396), MyServer)
     print('Server started http://%s:%s' % ('localhost', 35396))
 
@@ -105,4 +141,5 @@ if __name__ == '__main__':
         pass
 
     webServer.server_close()
+    running = False
     print('Server stopped.')
