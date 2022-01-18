@@ -1,0 +1,53 @@
+#!/usr/bin/env python
+
+import json
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Thread
+
+import server.energy_generation as generation
+import server.energy_usage as usage
+import server.utils as utils
+
+
+class MyServer(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/json')
+        self.end_headers()
+        response = {}
+        for source in usage.sources:
+            response[source.id] = {
+                'name': source.name,
+                'joules': source.joules,
+                'watts': source.watts,
+                'wattsOverTime': list(source.watts_over_time),
+                'joulesPerQuarterHour': source.joules_per_quarter_hour,
+            }
+        response['generation'] = {}
+        for day in generation.infos_by_day.keys():
+            infos = generation.infos_by_day[day]
+            response['generation'][day] = {
+                'storage': list(map(lambda info: info.storage, infos)),
+                'renewable': list(map(lambda info: info.renewable, infos)),
+                'nonRenewable': list(map(lambda info: info.non_renewable, infos)),
+                'unknown': list(map(lambda info: info.unknown, infos)),
+            }
+        self.wfile.write(bytes(json.dumps(response), 'utf-8'))
+        self.wfile.write(bytes('\n', 'utf-8'))
+
+
+def run():
+    Thread(target=usage.monitor, args=()).start()
+    Thread(target=generation.monitor, args=()).start()
+
+    web_server = HTTPServer(('localhost', 35396), MyServer)
+    print('Server started http://%s:%s' % ('localhost', 35396))
+
+    try:
+        web_server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+
+    web_server.server_close()
+    utils.running = False
+    print('Server stopped.')
