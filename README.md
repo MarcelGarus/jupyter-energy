@@ -83,3 +83,11 @@ This folder contains an extension for Jupyter Notebooks.
   ```bash
   jupyter notebook
   ```
+
+## TODO
+
+- show infos about energy generation and whether the energy was probably generated in a renewable way
+- restructure python-energy server
+- show when the notebook ran in graph
+- support nvidia GPUs
+- support Jetson counters
