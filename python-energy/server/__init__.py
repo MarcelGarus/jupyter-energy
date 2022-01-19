@@ -21,17 +21,14 @@ class MyServer(BaseHTTPRequestHandler):
                 'joules': source.joules,
                 'watts': source.watts,
                 'wattsOverTime': list(source.watts_over_time),
-                'joulesPerQuarterHour': source.joules_per_quarter_hour,
+                'longTermJoules': source.long_term_joules,
             }
-        response['generation'] = {}
-        for day in generation.infos_by_day.keys():
-            infos = generation.infos_by_day[day]
-            response['generation'][day] = {
-                'storage': list(map(lambda info: info.storage, infos)),
-                'renewable': list(map(lambda info: info.renewable, infos)),
-                'nonRenewable': list(map(lambda info: info.non_renewable, infos)),
-                'unknown': list(map(lambda info: info.unknown, infos)),
-            }
+        response['generation'] = {
+            'storage': list(map(lambda info: info.storage, generation.infos)),
+            'renewable': list(map(lambda info: info.renewable, generation.infos)),
+            'nonRenewable': list(map(lambda info: info.non_renewable, generation.infos)),
+            'unknown': list(map(lambda info: info.unknown, generation.infos)),
+        }
         self.wfile.write(bytes(json.dumps(response), 'utf-8'))
         self.wfile.write(bytes('\n', 'utf-8'))
 
@@ -49,5 +46,4 @@ def run():
         pass
 
     web_server.server_close()
-    utils.running = False
-    print('Server stopped.')
+    print('Server stopped. Interrupt again to also stop generation and usage monitors.')

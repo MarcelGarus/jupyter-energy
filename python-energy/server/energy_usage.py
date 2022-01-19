@@ -1,17 +1,11 @@
 
 
-import ctypes
 import itertools
-import json
-import os.path as osp
 import time
 from collections import deque
 from datetime import datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from math import ceil, floor
-from threading import Thread
+from math import ceil
 
-import requests
 from measure import OngoingEnergyRecording, record_energy
 
 from server.utils import *
@@ -25,8 +19,8 @@ class Source:
         self.joules = 0
         self.watts = 0
         self.watts_over_time = deque([])
-        # map from days to lists with joules per 15 minutes
-        self.joules_per_quarter_hour = {}
+        # list with one joule value per long_term_resolution since server start
+        self.long_term_joules = []
 
 
 sources = [
@@ -37,37 +31,25 @@ sources = [
 ]
 
 
-# Is called every second
 def tick():
     for source in sources:
         joules = source.recording.used_joules()
-        source.watts = joules - source.joules
+        source.watts = (joules - source.joules) / \
+            short_term_resolution.total_seconds()
         source.joules = joules
 
         source.watts_over_time.append(source.watts)
         if len(source.watts_over_time) > 100:
             source.watts_over_time.popleft()
 
-        now = datetime.now()
-        beginning_of_day = datetime(now.year, now.month, now.day, 0, 0, 0)
-        quarter_hours_since_beginning_of_day = ceil((
-            now - beginning_of_day).total_seconds() / (60 * 15))
-        day = beginning_of_day.strftime('%Y-%m-%d')
-        if day not in source.joules_per_quarter_hour:
-            source.joules_per_quarter_hour[day] = []
-        while len(source.joules_per_quarter_hour[day]) < quarter_hours_since_beginning_of_day - 1:
-            source.joules_per_quarter_hour[day].append(0)
-        if len(source.joules_per_quarter_hour[day]) < quarter_hours_since_beginning_of_day:
-            source.joules_per_quarter_hour[day].append(source.watts)
+        index = ceil((datetime.now() - server_started) / long_term_resolution)
+        while len(source.long_term_joules) < index - 1:
+            source.long_term_joules.append(0)
+        if len(source.long_term_joules) < index:
+            source.long_term_joules.append(source.watts)
         else:
-            source.joules_per_quarter_hour[day][quarter_hours_since_beginning_of_day - 1] += source.watts
+            source.long_term_joules[index - 1] += source.watts
 
 
 def monitor():
-    start_time = time.time()
-    interval = 1
-    for i in itertools.count():
-        if not running:
-            return
-        time.sleep(max(0, start_time + i*interval - time.time()))
-        tick()
+    tick_repeatedly(short_term_resolution, tick)

@@ -1,4 +1,5 @@
-python-energy/measure
-python-energy/measure.so
+python-energy/measure/measure
+*.so
 rust-energy/target
 .ipynb_checkpoints
+__pycache__

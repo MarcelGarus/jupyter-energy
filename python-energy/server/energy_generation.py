@@ -1,7 +1,6 @@
-import itertools
 import json
-import time
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import List
 
 import requests
 
@@ -24,27 +23,15 @@ class Info:
         }
 
 
-# A map from ISO-8859-1 date notation to lists that contain a renewable for
-# every 15 minutes.
-infos_by_day = {}
+def _get_info(day: datetime):
+    # Returns a list of `Info`s, one for every long_term_resolution since the day started.
 
-
-def _get_info():
-    # Returns a list of `GenerationInfo`, one for every quarter hour since the day started.
-
-    r = requests.get(
-        'https://transparency.entsoe.eu/generation/r2/actualGenerationPerProductionType/show?name=&defaultValue=false&viewType=GRAPH&areaType=CTY&atch=false&datepicker-day-offset-select-dv-date-from_input=D&dateTime.dateTime=16.01.2022 00:00|CET|DAYTIMERANGE&dateTime.endDateTime=16.01.2022 00:00|CET|DAYTIMERANGE&area.values=CTY|10Y1001A1001A83F!CTY|10Y1001A1001A83F&productionType.values=B01&productionType.values=B02&productionType.values=B03&productionType.values=B04&productionType.values=B05&productionType.values=B06&productionType.values=B07&productionType.values=B08&productionType.values=B09&productionType.values=B10&productionType.values=B11&productionType.values=B12&productionType.values=B13&productionType.values=B14&productionType.values=B20&productionType.values=B15&productionType.values=B16&productionType.values=B17&productionType.values=B18&productionType.values=B19&dateTime.timezone=CET_CEST&dateTime.timezone_input=CET (UTC+1) / CEST (UTC+2)&_=1642498848217',
-        # headers={
-        #     'Referer': 'https://transparency.entsoe.eu/generation/r2/actualGenerationPerProductionType/show?name=&defaultValue=false&viewType=GRAPH&areaType=CTY&atch=false&datepicker-day-offset-select-dv-date-from_input=D&dateTime.dateTime=16.01.2022+00:00|CET|DAYTIMERANGE&dateTime.endDateTime=16.01.2022+00:00|CET|DAYTIMERANGE&area.values=CTY|10Y1001A1001A83F!CTY|10Y1001A1001A83F&productionType.values=B01&productionType.values=B02&productionType.values=B03&productionType.values=B04&productionType.values=B05&productionType.values=B06&productionType.values=B07&productionType.values=B08&productionType.values=B09&productionType.values=B10&productionType.values=B11&productionType.values=B12&productionType.values=B13&productionType.values=B14&productionType.values=B20&productionType.values=B15&productionType.values=B16&productionType.values=B17&productionType.values=B18&productionType.values=B19&dateTime.timezone=CET_CEST&dateTime.timezone_input=CET+(UTC+1)+/+CEST+(UTC+2)',
-        #     'Content-Type': 'application/json;charset=UTF-8',
-        #     'Host': 'transparency.entsoe.eu',
-        # }
-    )
+    url = 'https://transparency.entsoe.eu/generation/r2/actualGenerationPerProductionType/show?name=&defaultValue=false&viewType=GRAPH&areaType=CTY&atch=false&datepicker-day-offset-select-dv-date-from_input=D&dateTime.dateTime=16.01.2022 00:00|CET|DAYTIMERANGE&dateTime.endDateTime=16.01.2022 00:00|CET|DAYTIMERANGE&area.values=CTY|10Y1001A1001A83F!CTY|10Y1001A1001A83F&productionType.values=B01&productionType.values=B02&productionType.values=B03&productionType.values=B04&productionType.values=B05&productionType.values=B06&productionType.values=B07&productionType.values=B08&productionType.values=B09&productionType.values=B10&productionType.values=B11&productionType.values=B12&productionType.values=B13&productionType.values=B14&productionType.values=B20&productionType.values=B15&productionType.values=B16&productionType.values=B17&productionType.values=B18&productionType.values=B19&dateTime.timezone=CET_CEST&dateTime.timezone_input=CET (UTC+1) / CEST (UTC+2)&_=1642498848217'
+    r = requests.get(url)
     print(r)
 
     content = str(r.content)
     chart = json.loads(content.split('var chart = ')[1].split(';')[0])
-    # print(chart)
 
     keys = chart['chartKeys']
     renewable_keys, non_renewable_keys, storage_keys, unknown_keys = set(), set(), set(), set()
@@ -90,17 +77,32 @@ def _get_info():
     return output
 
 
+# A map from days to a list of `Info`s reported for that day.
+_infos_by_day = {}
+
+# A list that contains an Info for every long_term_resolution since the server
+# started.
+infos: List[datetime] = []
+
+
 def tick():
-    today = datetime.now().strftime('%Y-%m-%d')
-    list_of_generation_info = _get_info()
-    infos_by_day[today] = list_of_generation_info
+    global infos
+
+    today = only_date(datetime.now())
+    day_info = _get_info(today)
+    _infos_by_day[today.isoformat()] = day_info
+
+    infos = []
+    day = only_date(server_started)
+    while day <= today:
+        day_infos = _infos_by_day[day.isoformat()]
+        if day == only_date(server_started):
+            to_trim = round((server_started - only_date(server_started)) /
+                            long_term_resolution)
+            day_infos = day_infos[to_trim:]
+        infos.extend(day_infos)
+        day += timedelta(days=1)
 
 
 def monitor():
-    start_time = time.time()
-    interval = 60 * 15
-    for i in itertools.count():
-        if not running:
-            return
-        time.sleep(max(0, start_time + i*interval - time.time()))
-        tick()
+    tick_repeatedly(long_term_resolution, tick)
