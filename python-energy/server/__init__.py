@@ -14,9 +14,12 @@ class MyServer(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/json')
         self.end_headers()
-        response = {}
+        response = {
+            'usage': {},
+            'generation': {},
+        }
         for source in usage.sources:
-            response[source.id] = {
+            response['usage'][source.id] = {
                 'name': source.name,
                 'joules': source.joules,
                 'watts': source.watts,
