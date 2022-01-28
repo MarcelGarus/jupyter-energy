@@ -1,7 +1,8 @@
 from typing import Optional
 
-from jupyter_resource_usage.metrics import PSUtilMetricsLoader
 from prometheus_client import Gauge
+
+from jupyter_energy.metrics import PSUtilMetricsLoader
 
 try:
     # Traitlets >= 4.3.3

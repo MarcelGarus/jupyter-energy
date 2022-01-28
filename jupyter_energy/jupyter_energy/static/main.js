@@ -196,22 +196,22 @@ define([
         }
         getMetrics(function (metrics) {
             console.log(metrics);
-            const comparison = comparisonForJoules(metrics.all.joules);
+            const comparison = comparisonForJoules(metrics.usage.all.joules);
 
-            $('#je-toolbar-metric-current').text(humanPower(metrics.all.watts));
-            $('#je-toolbar-metric-total').text(humanEnergy(metrics.all.joules));
+            $('#je-toolbar-metric-current').text(humanPower(metrics.usage.all.watts));
+            $('#je-toolbar-metric-total').text(humanEnergy(metrics.usage.all.joules));
             $('#je-toolbar-comparison-emoji').text(comparison.emoji);
 
-            $('#je-menu-metric-total').text(humanEnergy(metrics.all.joules));
+            $('#je-menu-metric-total').text(humanEnergy(metrics.usage.all.joules));
             $('#je-menu-comparison-text').text(comparison.text);
             $('#je-menu-comparison-emoji').text(comparison.emoji);
 
-            const timelineLength = Object.values(metrics)[0].wattsOverTime.length;
+            const timelineLength = Object.values(metrics.usage)[0].wattsOverTime.length;
             const labels = Array(timelineLength).fill().map((_, index) => '-' + (timelineLength - index) + 's');
             const colors = ['#BD74E7', '#264653', '#2A9D8F', '#E9C46A', '#F4A261', '#E76F51'];
 
             const data = { labels: labels, datasets: [] };
-            for (const source of Object.values(metrics)) {
+            for (const source of Object.values(metrics.usage)) {
                 // console.log('Source: ' + source);
                 const color = colors.pop();
                 data.datasets.push({

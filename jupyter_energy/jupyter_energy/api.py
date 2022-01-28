@@ -21,10 +21,13 @@ class ApiHandler(APIHandler):
         Calculate and return current energy metrics
         """
         metrics = fetch_energy_metrics()
-        response = {}
-        for id, source in metrics.items():
-            initial_source = self.initial_metrics[id]
-            response[id] = {
+        response = {
+            'usage': {},
+            'generation': {}
+        }
+        for id, source in metrics['usage'].items():
+            initial_source = self.initial_metrics['usage'][id]
+            response['usage'][id] = {
                 'name': source['name'],
                 'joules': source['joules'] - initial_source['joules'],
                 'watts': source['watts'],
