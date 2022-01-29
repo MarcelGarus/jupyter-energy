@@ -32,6 +32,8 @@ class ApiHandler(APIHandler):
                 'joules': source['joules'] - initial_source['joules'],
                 'watts': source['watts'],
                 'wattsOverTime': source['wattsOverTime'],  # TODO: possibly shorten it
+                'longTermJoules': source['longTermJoules'],
             }
+        response['generation'] = metrics['generation']
         print(f'Response: {response}')
         self.write(json.dumps(response))
