@@ -1,7 +1,3 @@
-// import './main.js';
-// import 'https://cdn.jsdelivr.net/npm/chart.js';
-
-console.trace();
 define([
     'jquery',
     'base/js/utils',
@@ -205,6 +201,20 @@ define([
             $('#je-menu-metric-total').text(humanEnergy(metrics.usage.all.joules));
             $('#je-menu-comparison-text').text(comparison.text);
             $('#je-menu-comparison-emoji').text(comparison.emoji);
+
+            const renewablePercentage = (() => {
+                const longTermJoules = metrics.usage.all.longTermJoules;
+                if (longTermJoules.length == 0) return null;
+                const generation = metrics.generation;
+                let percentages = [];
+                for (var i = 0; i < longTermJoules.length; i++) {
+                    const renewable = generation.renewable[i];
+                    const other = generation.storage[i] + generation.nonRenewable[i] + generation.unknown[i];
+                    percentages.push(renewable / (renewable + other));
+                }
+                return percentages.reduce((a, b) => a + b) / longTermJoules.length;
+            })();
+            // $('je-menu-renewable-percentage').text(renewablePercentage + ' %');
 
             const timelineLength = Object.values(metrics.usage)[0].wattsOverTime.length;
             const labels = Array(timelineLength).fill().map((_, index) => '-' + (timelineLength - index) + 's');
