@@ -41,7 +41,7 @@ def run():
     Thread(target=generation.monitor, args=()).start()
 
     web_server = HTTPServer(('localhost', 35396), MyServer)
-    print('Server started http://%s:%s' % ('localhost', 35396))
+    print('Server started at http://%s:%s' % ('localhost', 35396))
 
     try:
         web_server.serve_forever()

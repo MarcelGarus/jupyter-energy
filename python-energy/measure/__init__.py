@@ -11,8 +11,8 @@ class MeasureError(Exception):
         super().__init__(f'{type}: {arg}')
 
 
-def assert_valid(event_type, obj):
-    def fail(msg): raise MeasureError(event_type, msg)
+def assert_valid(name, obj):
+    def fail(msg): raise MeasureError(name, msg)
     if obj >= 0:
         return obj
     if obj == -1:
@@ -34,29 +34,72 @@ def assert_valid(event_type, obj):
     raise fail('Shared library returned unknown error code.')
 
 
-class OngoingEnergyRecording:
-    dll = ctypes.CDLL(f'{HERE}/measure.so')
+_rapl = ctypes.CDLL(f'{HERE}/rapl.so')
+_mcp = ctypes.CDLL(f'{HERE}/mcp.so')
 
+class RaplHandle:
     def __init__(self, event_type: str):
         self.event_type = event_type
         self.handle = -1
-        start_recording_energy = self.dll.start_recording_energy
-        start_recording_energy.restype = ctypes.c_long
-        self.handle = self.assert_valid(
-            start_recording_energy(event_type.encode('utf-8')))
+        create_handle = _rapl.create_handle
+        create_handle.restype = ctypes.c_long
+        self.handle = self.assert_valid(create_handle(event_type.encode('utf-8')))
 
     def assert_valid(self, obj):
         return assert_valid(self.event_type, obj)
 
     def used_joules(self):
-        energy_recording_state_in_joules = self.dll.energy_recording_state_in_joules
-        energy_recording_state_in_joules.restype = ctypes.c_double
-        return self.assert_valid(energy_recording_state_in_joules(self.handle))
+        read_handle_in_joules = _rapl.read_handle_in_joules
+        read_handle_in_joules.restype = ctypes.c_double
+        return self.assert_valid(read_handle_in_joules(self.handle))
 
     def __del__(self):
-        stop_recording_energy = self.dll.stop_recording_energy
-        self.assert_valid(stop_recording_energy(self.handle))
+        drop_handle = _rapl.drop_handle
+        drop_handle.restype = ctypes.c_int
+        try:
+            self.assert_valid(drop_handle(self.handle))
+        except MeasureError:
+            pass
 
 
-def record_energy(event_type: str):
-    return OngoingEnergyRecording(event_type)
+class McpDevice:
+    def __init__(self, filename: str):
+        self.filename = filename
+        self.device = -1
+        create_device = _mcp.create_device
+        create_device.restype = ctypes.c_long
+        self.device = self.assert_valid(create_device(filename.encode('utf-8')))
+
+    def assert_valid(self, obj):
+        return assert_valid(self.filename, obj)
+
+    def __del__(self):
+        drop_device = _mcp.drop_device
+        try:
+            self.assert_valid(drop_device(self.device))
+        except MeasureError:
+            pass
+
+
+class McpHandle:
+    def __init__(self, device: McpDevice, channel: int):
+        self.device = device
+        self.handle = -1
+        create_handle = _mcp.create_handle
+        create_handle.restype = ctypes.c_long
+        self.handle = self.assert_valid(create_handle(device.device, channel))
+
+    def assert_valid(self, obj):
+        return assert_valid(self.device.filename, obj)
+
+    def current_watts(self):
+        read_handle_in_watts = _mcp.read_handle_in_watts
+        read_handle_in_watts.restype = ctypes.c_double
+        return self.assert_valid(read_handle_in_watts(self.handle))
+
+    def __del__(self):
+        drop_handle = _mcp.drop_handle
+        try:
+            self.assert_valid(drop_handle(self.handle))
+        except MeasureError:
+            pass

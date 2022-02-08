@@ -51,10 +51,10 @@ def _get_info(day: datetime):
             non_renewable_keys.add(key)
         else:
             unknown_keys.add(key)
-    print(f'Renewable: {renewable_keys}')
-    print(f'Non-Renewable: {non_renewable_keys}')
-    print(f'From Storage: {storage_keys}')
-    print(f'Unknown: {unknown_keys}')
+    # print(f'Renewable: {renewable_keys}')
+    # print(f'Non-Renewable: {non_renewable_keys}')
+    # print(f'From Storage: {storage_keys}')
+    # print(f'Unknown: {unknown_keys}')
 
     assert(chart['chartDesign']['xAxisTitle'] == 'Time [Hours]')
 

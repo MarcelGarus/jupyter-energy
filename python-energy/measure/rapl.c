@@ -1,123 +1,61 @@
-// MIT-licensed by Marcel Garus in 2021.
-
 // This file defines both a library and a standalone program:
 //
-// * To use it as a library, run `gcc --shared measure.c -o measure.so`. See the
+// * To use it as a library, run `gcc --shared rapl.c -o rapl.so`. See the
 //   `main` function at the bottom of this file for how to use the library.
-// * To use it as a program, run `gcc measure.c -o measure`.
+// * To use it as a program, run `gcc rapl.c -o rapl && ./rapl`.
 //
 // This library is basically a very very stripped down version of the core
 // functionality of [Pinpoint](https://github.com/osmhpi/pinpoint) with a very
 // slim API on top.
 
-#include <linux/perf_event.h>
-#include <sys/syscall.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <stdbool.h>
-
-// First, here are some utility functions that are used in the rest of this
-// file.
-
-/// Reads the file at the given path and returns its content with trailing
-/// whitespace stripped.
-///
-/// Returns:
-/// positive: A pointer to the content.
-/// 0:        The file couldn't be read. Most likely, the file doesn't exist or
-///           this program doesn't have access.
-///
-/// Ownership: Borrows the path. Gives the caller ownership of the content.
-char *_read_stripped_file(char *path)
-{
-    FILE *file = fopen(path, "rb");
-    if (!file)
-        return 0;
-    char *buffer = malloc(1024);
-    if (!buffer)
-        return 0;
-    size_t length = fread(buffer, 1, 1024, file);
-    fclose(file);
-    buffer[length] = '\0';
-    while (buffer[strlen(buffer) - 1] == '\n' || buffer[strlen(buffer) - 1] == ' ')
-    {
-        buffer[strlen(buffer) - 1] = '\0';
-    }
-    return buffer;
-}
-
-/// Concatenates the three given strings.
-///
-/// Ownership: Borrows the three strings. Gives the caller ownership of the
-/// result.
-char *_concat_strings(char *first, char *second, char *third)
-{
-    char *result = malloc(sizeof(char) * (strlen(first) + strlen(second) + strlen(third) + 1));
-    sprintf(result, "%s%s%s", first, second, third);
-    return result;
-}
-
-// Now that we defined some utilities, this is the actual library:
+#include "utils.c"
 
 /// When users of this library start tracking an energy event, they are given a
 /// pointer to this handle. They should treat it as an opaque token (not look at
 /// the content) and instead only use it for further communication with this
-/// library, such as getting the energy consumption since the token creation or
-/// freeing it.
-typedef struct EnergyRecordingHandle
+/// library, such as reading out the energy consumption since the token creation
+/// or dropping it.
+typedef struct RaplHandle
 {
     long file_descriptor;
     double joules_per_tick;
     long int ticks_at_creation;
-} EnergyRecordingHandle;
-
-#define ENERGY_IN_JOULES double
-#define ERR_EVENT_NOT_SUPPORTED -1
-#define ERR_UNKNOWN_UNIT -2 // Different than joules
-#define ERR_CANNOT_ACCESS_POWER_MEASUREMENT -3
-#define ERR_UNEXPECTED_EVENT_CONFIG -4
-#define ERR_MISSING_PERMISSION -5
-#define ERR_SYSCALL_FAILED_FOR_UNKNOWN_REASON -6
-#define ERR_COULDNT_READ_CONSUMED_ENERGY -7
-#define ERR_INVALID_HANDLE -8
+} RaplHandle;
 
 /// Starts capturing events and returns a handle that allows you to request the
-/// current amount of joules.
+/// energy currently consumed as joules.
 ///
 /// Returns:
-/// positive: Everything went successful. This is an EnergyRecordingHandle.
-/// negative: One of the errors defined above.
+/// positive: Everything went successful. This is a RaplHandle.
+/// negative: One of the errors defined in utils.
 ///
 /// Ownership: Borrows input. Gives caller ownership of returned handle.
-EnergyRecordingHandle *start_recording_energy(char *event)
+RaplHandle *create_handle(char *event)
 {
     char *base_path = "/sys/bus/event_source/devices/power/events/";
 
     // Determine the power type.
     char *power_type_str = _read_stripped_file("/sys/bus/event_source/devices/power/type");
     if (power_type_str == 0)
-        return (EnergyRecordingHandle *)ERR_CANNOT_ACCESS_POWER_MEASUREMENT;
+        return (RaplHandle *)ERR_CANNOT_ACCESS_POWER_MEASUREMENT;
     long power_type = strtol(power_type_str, NULL, 10);
     free(power_type_str);
 
     // Make sure the energy is measured in joules.
     char *unit = _read_stripped_file(_concat_strings(base_path, event, ".unit"));
     if (unit == 0)
-        return (EnergyRecordingHandle *)ERR_EVENT_NOT_SUPPORTED;
+        return (RaplHandle *)ERR_EVENT_NOT_SUPPORTED;
     if (0 != strcmp(unit, "Joules"))
     {
         printf("Unknown unit \"%s\".\n", unit);
-        return (EnergyRecordingHandle *)ERR_UNKNOWN_UNIT;
+        return (RaplHandle *)ERR_UNKNOWN_UNIT;
     }
     free(unit);
 
     // Determine the scale (joules per tick).
     char *scale = _read_stripped_file(_concat_strings(base_path, event, ".scale"));
     if (scale == 0)
-        return (EnergyRecordingHandle *)ERR_EVENT_NOT_SUPPORTED;
+        return (RaplHandle *)ERR_EVENT_NOT_SUPPORTED;
     double joules_per_tick = strtod(scale, NULL);
     free(scale);
 
@@ -125,10 +63,10 @@ EnergyRecordingHandle *start_recording_energy(char *event)
     // "energy-cpu" have different configs.
     char *event_config_str = _read_stripped_file(_concat_strings(base_path, event, ""));
     if (event_config_str == 0)
-        return (EnergyRecordingHandle *)ERR_EVENT_NOT_SUPPORTED;
+        return (RaplHandle *)ERR_EVENT_NOT_SUPPORTED;
     char *prefix = "event=0x";
     if (0 != strncmp(prefix, event_config_str, strlen(prefix)))
-        return (EnergyRecordingHandle *)ERR_UNEXPECTED_EVENT_CONFIG;
+        return (RaplHandle *)ERR_UNEXPECTED_EVENT_CONFIG;
     long event_config = strtol(event_config_str + strlen(prefix), NULL, 16);
     free(event_config_str);
 
@@ -149,18 +87,20 @@ EnergyRecordingHandle *start_recording_energy(char *event)
     if (perf_file_descriptor < 0)
     {
         if (errno == EACCES)
-            return (EnergyRecordingHandle *)ERR_MISSING_PERMISSION;
+            return (RaplHandle *)ERR_MISSING_PERMISSION;
+        if (errno == EINVAL || errno == ENOENT)
+            return (RaplHandle *)ERR_EVENT_NOT_SUPPORTED;
         printf("syscall to perf_event_open failed for unknown reasons (errno %d)\n", errno);
-        return (EnergyRecordingHandle *)ERR_SYSCALL_FAILED_FOR_UNKNOWN_REASON;
+        return (RaplHandle *)ERR_SYSCALL_FAILED_FOR_UNKNOWN_REASON;
     }
 
     // Get current number of joules.
     long int current_ticks;
     if (read(perf_file_descriptor, &current_ticks, sizeof(long int)) != sizeof(long int))
-        return (EnergyRecordingHandle *)ERR_COULDNT_READ_CONSUMED_ENERGY;
+        return (RaplHandle *)ERR_COULDNT_READ_CONSUMED_ENERGY;
 
     // Create a handle and return it to the caller.
-    EnergyRecordingHandle *handle = malloc(sizeof(EnergyRecordingHandle));
+    RaplHandle *handle = malloc(sizeof(RaplHandle));
     handle->file_descriptor = perf_file_descriptor;
     handle->joules_per_tick = joules_per_tick;
     handle->ticks_at_creation = current_ticks;
@@ -176,9 +116,9 @@ EnergyRecordingHandle *start_recording_energy(char *event)
 ///
 /// Ownership: Borrows the handle. Gives ownership of the energy in joules to
 /// caller.
-ENERGY_IN_JOULES energy_recording_state_in_joules(EnergyRecordingHandle *handle)
+ENERGY_IN_JOULES read_handle_in_joules(RaplHandle *handle)
 {
-    if (handle < 0)
+    if ((long int)handle < 0l)
         return ERR_INVALID_HANDLE;
 
     long int current_ticks;
@@ -191,14 +131,15 @@ ENERGY_IN_JOULES energy_recording_state_in_joules(EnergyRecordingHandle *handle)
     return joules_since_creation;
 }
 
-/// Closes the given handle.
+/// Drops the given handle.
 ///
 /// Ownership: Takes ownership of the handle.
-int stop_recording_energy(EnergyRecordingHandle *handle)
+int drop_handle(RaplHandle *handle)
 {
-    if (handle < 0)
+    if ((long int)handle < 0l)
         return ERR_INVALID_HANDLE;
 
+    printf("Actually closing and freeing handle %ld.\n", (long int)handle);
     close(handle->file_descriptor);
     free(handle);
 
@@ -207,14 +148,14 @@ int stop_recording_energy(EnergyRecordingHandle *handle)
 
 // This file can not only used as a library, but can also as a standalone
 // program, which is especially useful for testing it in isolation. That's what
-// the main function is for. It also highlights how to use the library.
+// the main function is for. It also shows how to use the library.
 
 void main()
 {
     printf("Hello, world! Measuring your energy consumption...\n");
 
-    EnergyRecordingHandle *handle = start_recording_energy("energy-pkg");
-    if (handle < 0)
+    RaplHandle *handle = create_handle("energy-pkg");
+    if ((long int)handle < 0)
     {
         printf("Error: Handle is %ld.\n", (long int)handle);
         exit((int)(long int)handle);
@@ -224,10 +165,10 @@ void main()
     for (int i = 0; i < 3; i++)
     {
         sleep(1);
-        double joules_since_start = energy_recording_state_in_joules(handle);
+        double joules_since_start = read_handle_in_joules(handle);
         printf("Since this program started, your PC used %0.3f joules.\n", joules_since_start);
     }
 
-    stop_recording_energy(handle); // Invalidates the handle.
+    drop_handle(handle);
     printf("Recording stopped.\n");
 }
