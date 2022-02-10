@@ -11,8 +11,14 @@ from jupyter_energy.prometheus import PrometheusHandler
 
 HERE = osp.abspath(osp.dirname(__file__))
 
+print("jupyter_energy module imported")
+
 with open(osp.join(HERE, "labextension", "package.json")) as fid:
     data = json.load(fid)
+
+
+def _jupyter_server_extension_paths():
+    return [{"module": "jupyter_energy"}]
 
 
 def _jupyter_labextension_paths():
@@ -44,7 +50,7 @@ def _load_jupyter_server_extension(server_app):
     """
     Called during notebook start
     """
-    print("A notebook started and the extension is loaded.")
+    print("A notebook started and the jupyter_energy extension is loaded.")
     resuseconfig = ResourceUseDisplay(parent=server_app)
     server_app.web_app.settings["jupyter_energy_config"] = resuseconfig
     base_url = server_app.web_app.settings["base_url"]
