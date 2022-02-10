@@ -69,6 +69,10 @@ define([
             results.push({
                 'internal': internalDiff,
                 'external': externalDiff,
+                'time': {
+                    'wall': after[1].time.wall - before[1].time.wall,
+                    'user': after[1].time.user - before[1].time.user,
+                },
             });
         }
 

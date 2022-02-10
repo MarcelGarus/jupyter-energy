@@ -22,6 +22,10 @@ class ApiHandler(APIHandler):
         """
         metrics = fetch_energy_metrics()
         response = {
+            'time': {
+                'wall': time.time(),
+                'user': time.process_time(),
+            },
             'usage': {},
             'generation': {}
         }
