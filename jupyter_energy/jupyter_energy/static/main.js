@@ -28,6 +28,7 @@ define([
 
     async function runBenchmark() {
         console.log('Running benchmark.');
+        const results = [];
 
         const cell = Jupyter.notebook.get_selected_cell();
         if (!(cell instanceof codecell.CodeCell)) {
@@ -42,13 +43,13 @@ define([
         // on the device to be tested (proxied by the jupyter server and
         // extension), while another energy server is running on the testing
         // device, connected via MCP.
-        function getLocalMetrics() {
+        async function getLocalMetrics() {
             return await getJson(utils.get_body_data('baseUrl') + 'api/energy-metrics/v1');
         }
         function diffMetrics(before, after) {
             const response = {};
-            for (const source of Object.values(before.usage)) {
-                response[source.name] = after.usage[source.name].joules - before.usage[source.name];
+            for (const source of Object.keys(before.usage)) {
+                response[source] = after.usage[source].joules - before.usage[source].joules;
             }
             return response;
         }
@@ -58,14 +59,19 @@ define([
             const before = await Promise.all([getLocalMetrics(), getMetrics()]);
             await runCell(cell);
             const after = await Promise.all([getLocalMetrics(), getMetrics()]);
-            console.log('The benchmarking cell ran through.');
 
+            console.log('Energy usage:');
             const externalDiff = diffMetrics(before[0], after[0]);
             const internalDiff = diffMetrics(before[1], after[1]);
-            console.log('Energy usage:');
-            console.log('Measured internally: ' + internalDiff);
-            console.log('Measured externally: ' + externalDiff);
+            console.log('Measured internally: ' + JSON.stringify(internalDiff));
+            console.log('Measured externally: ' + JSON.stringify(externalDiff));
+            results.push({
+                'internal': internalDiff,
+                'external': externalDiff,
+            });
         }
+
+        console.log(JSON.stringify(results));
     }
 
     function setupDOM() {
@@ -232,7 +238,7 @@ define([
             return;
         }
         const metrics = await getMetrics();
-        console.log(metrics);
+        console.debug(metrics);
         const comparison = comparisonForJoules(metrics.usage.all.joules);
 
         $('#je-toolbar-metric-current').text(humanPower(metrics.usage.all.watts));
