@@ -44,7 +44,8 @@ define([
         // extension), while another energy server is running on the testing
         // device, connected via MCP.
         async function getLocalMetrics() {
-            return await getJson(utils.get_body_data('baseUrl') + 'api/energy-metrics/v1');
+            let response = await fetch("http://localhost:35396");
+            return await response.json();
         }
         function diffMetrics(before, after) {
             const response = {};
