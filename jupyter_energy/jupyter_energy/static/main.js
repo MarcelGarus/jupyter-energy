@@ -1,47 +1,81 @@
 define([
     'jquery',
+    'base/js/namespace',
+    'notebook/js/codecell',
     'base/js/utils',
     'nbextensions/jupyter_energy/charts'
-], function ($, utils) {
-    function getMetrics(callback) {
-        $.getJSON({
-            url: utils.get_body_data('baseUrl') + 'api/energy-metrics/v1',
-            success: callback
+], function ($, Jupyter, codecell, utils, charts) {
+    function getJson(url) {
+        return new Promise(resolve => {
+            $.getJSON({ url: url, success: (response) => resolve(response) });
         });
     }
 
-    function resetValues() {
-        initData();
-        displayMetrics();
+    async function getMetrics() {
+        return await getJson(utils.get_body_data('baseUrl') + 'api/energy-metrics/v1');
     }
 
-    let useWatt = false;
-    let chart = undefined;
+    function runCell(cell) {
+        return new Promise(resolve => {
+            function cellFinished() {
+                cell.events.off('finished_execute.CodeCell', cellFinished);
+                resolve();
+            }
+            cell.events.on('finished_execute.CodeCell', cellFinished);
+            cell.execute();
+        });
+    }
 
-    function toggleUnit() {
-        useWatt = !useWatt;
-        displayMetrics();
+    async function runBenchmark() {
+        console.log('Running benchmark.');
+
+        const cell = Jupyter.notebook.get_selected_cell();
+        if (!(cell instanceof codecell.CodeCell)) {
+            alert('Select the cell to run for the benchmark first.');
+            return;
+        }
+
+        console.log('Running cell to warm up.');
+        await runCell(cell);
+
+        // The intention of this benchmark is that one energy server is running
+        // on the device to be tested (proxied by the jupyter server and
+        // extension), while another energy server is running on the testing
+        // device, connected via MCP.
+        function getLocalMetrics() {
+            return await getJson(utils.get_body_data('baseUrl') + 'api/energy-metrics/v1');
+        }
+        function diffMetrics(before, after) {
+            const response = {};
+            for (const source of Object.values(before.usage)) {
+                response[source.name] = after.usage[source.name].joules - before.usage[source.name];
+            }
+            return response;
+        }
+
+        for (let i = 0; i < 10; i++) {
+            console.log('Running the benchmarking cell. Run #' + i);
+            const before = await Promise.all([getLocalMetrics(), getMetrics()]);
+            await runCell(cell);
+            const after = await Promise.all([getLocalMetrics(), getMetrics()]);
+            console.log('The benchmarking cell ran through.');
+
+            const externalDiff = diffMetrics(before[0], after[0]);
+            const internalDiff = diffMetrics(before[1], after[1]);
+            console.log('Energy usage:');
+            console.log('Measured internally: ' + internalDiff);
+            console.log('Measured externally: ' + externalDiff);
+        }
     }
 
     function setupDOM() {
         let menuOpened = false;
-        function openMenu() {
-            document.getElementById('je-menu').style.visibility = 'visible';
-            menuOpened = true;
-        }
-        function closeMenu() {
-            document.getElementById('je-menu').style.visibility = 'hidden';
-            menuOpened = false;
-        }
         function toggleMenu() {
-            if (menuOpened) {
-                closeMenu();
-            } else {
-                openMenu();
-            }
+            menuOpened = !menuOpened;
+            document.getElementById('je-menu').style.visibility = menuOpened ? 'visible' : 'hidden';
         }
+
         // We use je as a prefix for jupyter-energy related stuff.
-        $('head').append($('<script>').attr('src', 'https://cdn.jsdelivr.net/npm/chart.js'));
         $('#maintoolbar-container').append(
             $('<button>').attr('id', 'je-toolbar')
                 .click((_) => toggleMenu())
@@ -64,7 +98,7 @@ define([
                     .append($('<div>').attr('id', 'je-menu-comparison-emoji'))
                     .append($('<span>').text('Your computer used '))
                     .append($('<strong>').text('…').attr('id', 'je-menu-metric-total'))
-                    .append($('<span>').text(' since you opened this notebook. This is enough energy to '))
+                    .append($('<span>').text(' since you started the Jupyter server. This is enough energy to '))
                     .append($('<strong>').text('…').attr('id', 'je-menu-comparison-text'))
                     .append($('<span>').text('.')))
                 .append($('<div>')
@@ -78,9 +112,8 @@ define([
                         .click((_) => toggleUnit()))
                     .append($('<button>')
                         .addClass('btn').addClass('btn-default')
-                        .attr('style', 'margin-left: 1em;')
-                        .text('Reset values')
-                        .click((_) => resetValues())))
+                        .text('Start benchmark')
+                        .click((_) => runBenchmark())))
                 .append($('<div>')
                     .addClass('je-menu-section')
                     .addClass('je-menu-footer')
@@ -116,6 +149,14 @@ define([
             }
             #jupyter-resource-usage-display { display: none; }
         `));
+    }
+
+    let useWatt = false;
+    let chart = undefined;
+
+    function toggleUnit() {
+        useWatt = !useWatt;
+        displayMetrics();
     }
 
     function humanSiPrefixed(size) {
@@ -185,79 +226,66 @@ define([
         throw 'Shouldn\'t be reached. Joules: ' + joules;
     }
 
-    function displayMetrics() {
+    async function displayMetrics() {
         if (document.hidden) {
             // Don't poll when nobody is looking.
             return;
         }
-        getMetrics(function (metrics) {
-            console.log(metrics);
-            const comparison = comparisonForJoules(metrics.usage.all.joules);
+        const metrics = await getMetrics();
+        console.log(metrics);
+        const comparison = comparisonForJoules(metrics.usage.all.joules);
 
-            $('#je-toolbar-metric-current').text(humanPower(metrics.usage.all.watts));
-            $('#je-toolbar-metric-total').text(humanEnergy(metrics.usage.all.joules));
-            $('#je-toolbar-comparison-emoji').text(comparison.emoji);
+        $('#je-toolbar-metric-current').text(humanPower(metrics.usage.all.watts));
+        $('#je-toolbar-metric-total').text(humanEnergy(metrics.usage.all.joules));
+        $('#je-toolbar-comparison-emoji').text(comparison.emoji);
 
-            $('#je-menu-metric-total').text(humanEnergy(metrics.usage.all.joules));
-            $('#je-menu-comparison-text').text(comparison.text);
-            $('#je-menu-comparison-emoji').text(comparison.emoji);
+        $('#je-menu-metric-total').text(humanEnergy(metrics.usage.all.joules));
+        $('#je-menu-comparison-text').text(comparison.text);
+        $('#je-menu-comparison-emoji').text(comparison.emoji);
 
-            const renewablePercentage = (() => {
-                const longTermJoules = metrics.usage.all.longTermJoules;
-                if (longTermJoules.length == 0) return null;
-                const generation = metrics.generation;
-                let percentages = [];
-                for (var i = 0; i < longTermJoules.length; i++) {
-                    const renewable = generation.renewable[i];
-                    const other = generation.storage[i] + generation.nonRenewable[i] + generation.unknown[i];
-                    percentages.push(renewable / (renewable + other));
-                }
-                return percentages.reduce((a, b) => a + b) / longTermJoules.length;
-            })();
-            // $('je-menu-renewable-percentage').text(renewablePercentage + ' %');
+        const timelineLength = Object.values(metrics.usage)[0].wattsOverTime.length;
+        const labels = Array(timelineLength).fill().map((_, index) => '-' + (timelineLength - index) + 's');
+        const colors = ['#BD74E7', '#264653', '#2A9D8F', '#E9C46A', '#F4A261', '#E76F51'];
 
-            const timelineLength = Object.values(metrics.usage)[0].wattsOverTime.length;
-            const labels = Array(timelineLength).fill().map((_, index) => '-' + (timelineLength - index) + 's');
-            const colors = ['#BD74E7', '#264653', '#2A9D8F', '#E9C46A', '#F4A261', '#E76F51'];
-
-            const data = { labels: labels, datasets: [] };
-            for (const source of Object.values(metrics.usage)) {
-                // console.log('Source: ' + source);
-                const color = colors.pop();
-                data.datasets.push({
-                    label: source.name + ' (' + humanEnergy(source.joules) + ')',
-                    backgroundColor: color,
-                    borderColor: color,
-                    data: source.wattsOverTime,
-                    radius: 0,
-                });
-            }
-            if (chart == undefined) {
-                chart = new Chart(document.getElementById('je-menu-chart'), {
-                    type: 'line',
-                    data: data,
-                    options: {
-                        animation: { duration: 0 },
-                    },
-                });
-            } else {
-                chart.data = data;
-                chart.update();
-            }
-
-        });
+        const data = { labels: labels, datasets: [] };
+        for (const source of Object.values(metrics.usage)) {
+            // console.log('Source: ' + source);
+            const color = colors.pop();
+            data.datasets.push({
+                label: source.name + ' (' + humanEnergy(source.joules) + ')',
+                backgroundColor: color,
+                borderColor: color,
+                data: source.wattsOverTime,
+                radius: 0,
+            });
+        }
+        if (chart == undefined) {
+            chart = new charts.Chart(document.getElementById('je-menu-chart'), {
+                type: 'line',
+                data: data,
+                options: {
+                    animation: { duration: 0 },
+                    scales: {
+                        y: { min: 0 }
+                    }
+                },
+            });
+        } else {
+            chart.data = data;
+            chart.update();
+        }
     };
 
     return {
-        load_ipython_extension: function () {
+        load_ipython_extension: async function () {
             setupDOM();
-            displayMetrics();
+            await displayMetrics();
             setInterval(displayMetrics, 1000);
 
-            document.addEventListener("visibilitychange", function () {
+            document.addEventListener("visibilitychange", async function () {
                 // Update instantly when user activates notebook tab.
                 // FIXME: Turn off update timer completely when tab not in focus.
-                displayMetrics();
+                await displayMetrics();
             }, false);
         },
     };
