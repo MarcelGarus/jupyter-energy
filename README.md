@@ -86,8 +86,9 @@ This folder contains an extension for Jupyter Notebooks.
 
 ## TODO
 
-- show infos about energy generation and whether the energy was probably generated in a renewable way
-- restructure python-energy server
-- show when the notebook ran in graph
-- support nvidia GPUs
+- graphical statistics (one for each benchmark, similar to existing) and relative benchmarks
+- show infos about energy generation (whether the energy was probably generated in a renewable way)
+- show when the notebook ran in the graph
 - support Jetson counters
+- write more documentation (also for benchmark)
+- run on FutureSOC lab
