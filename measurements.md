@@ -1,5 +1,7 @@
 # Measurements
 
+## Energy measurements of everyday objects
+
 what was measured                                   | how long | runs | used energy            | normalized
 ----------------------------------------------------|----------|------|------------------------|------------
 **Potsdam**                                         |          |      |                        |
@@ -69,8 +71,7 @@ PC booting                                          |     0:33 |    1 |   2109.5
 PC idle                                             |     0:60 |   15 |   2618.74 J +- 14.21%  |   43.6 W
 PC calculating chess moves                          |     0:60 |   15 |   3482.88 J +- 2.01%   |   58.0 W
 
-
-# Todo
+### Todo
 
 - charging my phone
 - charging my headphones
@@ -82,6 +83,32 @@ PC calculating chess moves                          |     0:60 |   15 |   3482.8
 - PC idle
 - PC in use
 
-# Interpretations
+## Energy measurements of the extension
 
-TODO
+- Eindot (Dwarf 1: Matrix Operations) https://github.com/numpy/numpy/blob/main/benchmarks/benchmarks/bench_linalg.py#L6
+- Matrix solving (Dwarf 2: Sparse Linear Algebra) https://github.com/scipy/scipy/blob/main/benchmarks/benchmarks/sparse_linalg_solve.py#L33
+- Conway's Game of Life (Dwarf 5: Structured Grid)
+- Bible index (Multiple concurrent memory scans)
+
+How to measure:
+
+- system info
+  - on Asus ZenBook 14
+  - Ubuntu 20.04.3
+- disable factors that affect energy usage
+  - disable power saving options in BIOS
+  - charge to full capacity
+  - disconnect all plugs (USB, HDMI) except power connector
+  - set screen and keyboard to full brightness
+  - turn off bluetooth
+  - kill GUI (go to terminal mode using Ctrl+Alt+F2, then kill GUI)
+- note several factors
+  - cpu frequency using `cpuinfo`
+  - running processes using `psaux`
+  - battery level and charging state using `upower -i /org/freedesktop/UPower/devices/battery_BAT0`
+- start Jupyter Notebook with `numactl -C 1 jupyter notebook` to fix it on one CPU core
+- benchmarks
+  - idle (energy only)
+  - blas/lapack
+  - kmeans
+  - Bible
