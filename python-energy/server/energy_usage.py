@@ -7,7 +7,7 @@ from datetime import datetime
 from math import ceil
 from re import M
 
-from measure import McpDevice, McpHandle, MeasureError, RaplHandle
+from measure import McpDevice, McpHandle, MeasureError, NvmlHandle, RaplHandle
 
 from server.utils import *
 
@@ -65,8 +65,22 @@ class McpSource(Source):
         self.watts = self.handle.current_watts()
         super().tick()
 
+class NvmlSource(Source):
+    def __init__(self, id: str, name: str, handle: NvmlHandle):
+        super().__init__(id, name)
+        self.handle = handle
+
+    def tick(self):
+        self.joules += self.watts * short_term_resolution.total_seconds()
+        self.watts = self.handle.current_watts()
+        super().tick()
+
+
 def discover_sources():
+    print("Discovering sources.")
+    
     # RAPL sources
+    print("Discovering RAPL.")
     rapl_sources = [
         # (internal id, user-visible name, event type)
         ('all', 'all', 'energy-pkg'),
@@ -81,6 +95,7 @@ def discover_sources():
             pass # Event is not available on this machine.
 
     # MCP sources
+    print("Discovering MCP.")
     for device_id in range(5):
         try:
             device = McpDevice(f'/dev/ttyACM{device_id}')
@@ -92,6 +107,16 @@ def discover_sources():
                 f'MCP {device_id}, channel {channel}',
                 McpHandle(device, channel),
             )
+
+    # NVML sources
+    print("Discovering NVML.")
+    for gpu_index in range(10):
+        try:
+            handle = NvmlHandle(gpu_index)
+        except MeasureError:
+            continue # This GPU doesn't exist.
+        yield NvmlSource(f'nvml{gpu_index}', f'External GPU {gpu_index}', handle)
+
 
 sources = list(discover_sources())
 if len(sources) == 0:

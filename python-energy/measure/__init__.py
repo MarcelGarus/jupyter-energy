@@ -3,6 +3,13 @@
 import ctypes
 import os.path as osp
 
+try:
+    from py3nvml import py3nvml as nvml
+    nvml.nvmlInit()
+except ImportError:
+    print("Couldn't import NVML. If you think this should be supported, try installing the py3nvml Python package.")
+    pass
+
 HERE = osp.abspath(osp.dirname(__file__))
 
 
@@ -103,3 +110,16 @@ class McpHandle:
             self.assert_valid(drop_handle(self.handle))
         except MeasureError:
             pass
+
+class NvmlHandle:
+    def __init__(self, gpu_index: int):
+        name = f'nvml{gpu_index}'
+        if nvml is None:
+            raise MeasureError(name, 'NVML is not supported. Try installing the py3nvml library.')
+        try:
+            self.device = nvml.nvmlDeviceGetHandleByIndex(gpu_index)
+        except nvml.NVMLError_InvalidArgument as e:
+            raise MeasureError(name, f"Couldn't get the device: {e}")
+
+    def current_watts(self):
+        return nvml.nvmlDeviceGetPowerUsage(self.device) / 1000
