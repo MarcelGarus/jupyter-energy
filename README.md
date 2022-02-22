@@ -86,7 +86,5 @@ This folder contains an extension for Jupyter Notebooks.
 
 ## TODO
 
-- show when the notebook ran in the graph
-- support Jetson counters
+- better labels
 - write more documentation (also for benchmark)
-- run on FutureSOC lab

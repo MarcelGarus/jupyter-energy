@@ -115,20 +115,23 @@ define([
                     .append($('<span>').text('.')))
                 .append($('<div>')
                     .addClass('je-menu-section')
-                    .addClass('je-renewable')
-                    .append($('<span>').text('That energy consumption consists of about '))
-                    .append($('<strong>').text('…%').attr('id', 'je-menu-metric-renewable-ratio'))
-                    .append($('<strong>').text(' renewable energy. '))
-                    .append($('<span>').text('Right now, about '))
-                    .append($('<strong>').text('…%').attr('id', 'je-menu-metric-renewable-now'))
-                    .append($('<span>').text(' of the energy in the power grid is from renewable sources.')))
+                    .addClass('je-time-frame-buttons')
+                    .addClass('btn-group')
+                    .append($('<button>')
+                        .attr('id', 'je-btn-short-term').addClass('btn').addClass('btn-default').addClass('je-time-frame-active-button')
+                        .text('Last 100 seconds')
+                        .click((_) => showLongTerm ? toggleTimeFrame() : null))
+                    .append($('<button>')
+                        .attr('id', 'je-btn-long-term').addClass('btn').addClass('btn-default')
+                        .text('Since server start')
+                        .click((_) => showLongTerm ? null : toggleTimeFrame())))
                 .append($('<div>')
                     .addClass('je-menu-section')
                     .append($('<canvas>').attr('id', 'je-menu-chart')))
                 .append($('<div>')
                     .addClass('je-menu-section')
                     .append($('<button>')
-                        .addClass('btn').addClass('btn-default')
+                        .addClass('btn').addClass('btn-default').attr('style', 'margin-right: 1em;')
                         .text('Switch units between J and Wh')
                         .click((_) => toggleUnit()))
                     .append($('<button>')
@@ -160,15 +163,21 @@ define([
             .je-menu-section {
                 margin-bottom: 1em;
             }
-            .je-renewable {
-                background: #9FC131;
-                padding: 0.8em;
-                border-radius: .8em;
-            }
             #je-menu-comparison-emoji {
                 float: right;
                 font-size: 3em;
                 margin-left: 0.5em;
+            }
+            .je-time-frame-buttons {
+                display: flex;
+                justify-content: center;
+            }
+            .je-time-frame-active-button {
+                color: #333;
+                background-color: #e6e6e6;
+                background-image: none;
+                border-color: #adadad;
+                box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125);
             }
             .je-menu-footer {
                 margin-bottom: 0;
@@ -180,6 +189,7 @@ define([
     }
 
     let useWatt = false;
+    let showLongTerm = false;
     let chart = undefined;
 
     function toggleUnit() {
@@ -189,7 +199,7 @@ define([
 
     function humanSiPrefixed(size) {
         const smallPrefixes = ['', 'm', 'μ', 'n'];
-        const bigPrefixes = ['', 'K', 'M', 'G', 'T', 'P'];
+        const bigPrefixes = ['', 'k', 'M', 'G', 'T', 'P'];
         let i = size == 0 ? 0 : Math.floor(Math.log(size) / Math.log(1000));
         const prefix = (i >= 0) ? bigPrefixes[Math.min(i, bigPrefixes.length - 1)]
             : smallPrefixes[Math.min(-i, smallPrefixes.length - 1)];
@@ -254,6 +264,26 @@ define([
         throw 'Shouldn\'t be reached. Joules: ' + joules;
     }
 
+    function toggleTimeFrame() {
+        showLongTerm = !showLongTerm;
+
+        if (showLongTerm) {
+            document.getElementById('je-btn-short-term').classList.remove('je-time-frame-active-button');
+            document.getElementById('je-btn-long-term').classList.add('je-time-frame-active-button');
+        } else {
+            document.getElementById('je-btn-short-term').classList.add('je-time-frame-active-button');
+            document.getElementById('je-btn-long-term').classList.remove('je-time-frame-active-button');
+        }
+
+        if (chart instanceof charts.Chart) {
+            console.log("Destroying chart.");
+            chart.destroy();
+        }
+        chart = undefined;
+
+        displayMetrics();
+    }
+
     let isRunning = false;
     let runningHistory = Array(100).fill(false);
 
@@ -265,10 +295,7 @@ define([
     }
 
     async function displayMetrics() {
-        if (document.hidden) {
-            // Don't poll when nobody is looking.
-            return;
-        }
+        console.log("Displaying metrics");
         const metrics = await getMetrics();
         console.debug(metrics);
         const comparison = comparisonForJoules(metrics.usage.all.joules);
@@ -281,6 +308,14 @@ define([
         $('#je-menu-comparison-text').text(comparison.text);
         $('#je-menu-comparison-emoji').text(comparison.emoji);
 
+        if (showLongTerm) {
+            displayLongTermChart(metrics);
+        } else {
+            displayShortTermChart(metrics);
+        }
+    }
+
+    function displayShortTermChart(metrics) {
         const timelineLength = Object.values(metrics.usage)[0].wattsOverTime.length;
         const labels = Array(timelineLength).fill().map((_, index) => '-' + (timelineLength - index) + 's');
         const colors = ['#BD74E7', '#264653', '#2A9D8F', '#E9C46A', '#F4A261', '#E76F51'];
@@ -324,33 +359,92 @@ define([
             chart.data = data;
             chart.update();
         }
+    }
 
-        // Calculate how much renewable energy was used. JS doesn't really have
-        // higher-level functions like `zip`, so this is kind of messy. Sorry
-        // about that.
-        let totalUsed = 0;
-        let renewableUsed = 0;
-        let currentRenewableRatio = 0;
-        for (let i = 0; i < metrics.usage.all.longTermJoules.length; i++) {
-            const renewablyGenerated = metrics.generation.renewable[i];
-            let totalGenerated = 0;
-            for (const sourceData of Object.values(metrics.generation)) {
-                totalGenerated += sourceData[i];
-            }
-            const renewableRatio = renewablyGenerated / totalGenerated;
+    function displayLongTermChart(metrics) {
+        const timelineLength = metrics.usage.all.longTermJoules.length;
+        const labels = Array(timelineLength).fill().map((_, index) => {
+            const totalMinutes = (timelineLength - index - 1) * 15;
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = (totalMinutes % 60);
+            return '-' + hours + ':' + (minutes.toString().length < 2 ? ('0' + minutes) : minutes) + 'h';
+        });
 
-            const used = metrics.usage.all.longTermJoules[i];
-            totalUsed += used;
-            renewableUsed += used * renewableRatio;
+        const data = { labels: labels, datasets: [] };
+        let max = Object.values(metrics.usage)
+            .map((it) => it.longTermJoules.reduce((a, b) => a > b ? a : b))
+            .reduce((a, b) => a > b ? a : b);
+        max = Math.round((max * 1.2) / 10) * 10;
 
-            if (i == metrics.usage.all.longTermJoules.length - 1) {
-                currentRenewableRatio = renewableRatio;
+        const colors = ['#BD74E7', '#264653', '#2A9D8F', '#E9C46A', '#F4A261', '#E76F51'];
+        for (const source of Object.values(metrics.usage)) {
+            const color = colors.pop();
+            data.datasets.push({
+                label: source.name + ' (' + humanEnergy(source.joules) + ')',
+                backgroundColor: color,
+                borderColor: color,
+                data: source.longTermJoules,
+                radius: 0,
+            });
+        }
+
+        const generationSources = ['renewable', 'nonRenewable', 'storage', 'unknown'];
+        const generationStacked = {};
+        for (const source of generationSources) {
+            const index = generationSources.indexOf(source);
+            const previousSource = index == 0 ? null : generationSources[index - 1];
+            generationStacked[source] = [];
+            for (let i = 0; i < timelineLength; i++) {
+                const previous = previousSource == null ? 0 : generationStacked[previousSource][i];
+                generationStacked[source].push(previous + metrics.generation[source][i]);
             }
         }
-        const renewableRatio = renewableUsed / totalUsed;
-        $('#je-menu-metric-renewable-ratio').text((renewableRatio * 100).toFixed(1) + '%');
-        $('#je-menu-metric-renewable-now').text((currentRenewableRatio * 100).toFixed(1) + '%');
-    };
+        for (const source of generationSources) {
+            for (let i = 0; i < timelineLength; i++) {
+                generationStacked[source][i] *= max / generationStacked[generationSources[generationSources.length - 1]][i];
+            }
+        }
+
+        const generationColors = {
+            'renewable': '#DCEAB0',
+            'nonRenewable': '#FDC6C6',
+            'storage': '#ffff44',
+            'unknown': '#444444',
+        };
+        const generationLabels = {
+            'renewable': 'renewable',
+            'nonRenewable': 'non-renewable',
+            'storage': 'from storage',
+            'unknown': 'unknown',
+        };
+        for (const source of generationSources) {
+            data.datasets.push({
+                label: generationLabels[source],
+                backgroundColor: generationColors[source],
+                borderColor: 'white',
+                fill: true,
+                data: generationStacked[source],
+                radius: 0,
+                borderWidth: 0,
+            });
+        }
+
+        console.log(data);
+        console.log(max);
+        if (chart == undefined) {
+            chart = new charts.Chart(document.getElementById('je-menu-chart'), {
+                type: 'line',
+                data: data,
+                options: {
+                    animation: { duration: 0 },
+                    scales: { y: { min: 0, max: max } }
+                },
+            });
+        } else {
+            chart.data = data;
+            chart.update();
+        }
+    }
 
     return {
         load_ipython_extension: async function () {
