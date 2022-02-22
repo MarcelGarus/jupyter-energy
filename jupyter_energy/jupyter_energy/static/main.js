@@ -1,10 +1,11 @@
 define([
     'jquery',
     'base/js/namespace',
-    'notebook/js/codecell',
+    'base/js/events',
     'base/js/utils',
+    'notebook/js/codecell',
     'nbextensions/jupyter_energy/charts'
-], function ($, Jupyter, codecell, utils, charts) {
+], function ($, Jupyter, events, utils, codecell, charts) {
     function getJson(url) {
         return new Promise(resolve => {
             $.getJSON({ url: url, success: (response) => resolve(response) });
@@ -253,6 +254,16 @@ define([
         throw 'Shouldn\'t be reached. Joules: ' + joules;
     }
 
+    let isRunning = false;
+    let runningHistory = Array(100).fill(false);
+
+    async function tickRunning() {
+        runningHistory.push(isRunning);
+        if (runningHistory.length > 100) {
+            runningHistory.shift();
+        }
+    }
+
     async function displayMetrics() {
         if (document.hidden) {
             // Don't poll when nobody is looking.
@@ -275,8 +286,8 @@ define([
         const colors = ['#BD74E7', '#264653', '#2A9D8F', '#E9C46A', '#F4A261', '#E76F51'];
 
         const data = { labels: labels, datasets: [] };
+        let max = 0;
         for (const source of Object.values(metrics.usage)) {
-            // console.log('Source: ' + source);
             const color = colors.pop();
             data.datasets.push({
                 label: source.name + ' (' + humanEnergy(source.joules) + ')',
@@ -285,14 +296,28 @@ define([
                 data: source.wattsOverTime,
                 radius: 0,
             });
+            const sourceMax = source.wattsOverTime.reduce((a, b) => a > b ? a : b);
+            if (sourceMax > max) max = sourceMax;
         }
+        max = Math.round((max * 1.2) / 10) * 10;
+        data.datasets.push({
+            label: 'This notebook is running code',
+            backgroundColor: 'rgba(0,200,0,0.3)',
+            borderColor: 'transparent',
+            fill: true,
+            stepped: true,
+            data: runningHistory.map((it) => it ? max : 0),
+            radius: 0,
+        });
+        console.log('Running history: ' + runningHistory);
+
         if (chart == undefined) {
             chart = new charts.Chart(document.getElementById('je-menu-chart'), {
                 type: 'line',
                 data: data,
                 options: {
                     animation: { duration: 0 },
-                    scales: { y: { min: 0 } }
+                    scales: { y: { min: 0, max: max } }
                 },
             });
         } else {
@@ -330,14 +355,30 @@ define([
     return {
         load_ipython_extension: async function () {
             setupDOM();
-            await displayMetrics();
-            setInterval(displayMetrics, 1000);
 
+            // Call `displayMetrics` every second, but only if the tab is in the
+            // foreground.
+            await displayMetrics();
+            setInterval(() => {
+                if (document.hidden) return; // Don't poll when nobody is looking.
+                displayMetrics();
+            }, 1000);
             document.addEventListener("visibilitychange", async function () {
                 // Update instantly when user activates notebook tab.
-                // FIXME: Turn off update timer completely when tab not in focus.
                 await displayMetrics();
             }, false);
+
+            // We record when the notebook was running vs. when it wasn't.
+            setInterval(tickRunning, 1000);
+            events.on('execute.CodeCell', (_, data) => {
+                isRunning = true;
+                const cell = data.cell;
+                function cellFinished() {
+                    cell.events.off('finished_execute.CodeCell', cellFinished);
+                    isRunning = false;
+                }
+                cell.events.on('finished_execute.CodeCell', cellFinished);
+            });
         },
     };
 });
