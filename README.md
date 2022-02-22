@@ -79,15 +79,13 @@ This folder contains an extension for Jupyter Notebooks.
   jupyter nbextension install --py jupyter_energy --symlink --sys-prefix
   jupyter nbextension enable --py jupyter_energy --sys-prefix
   ```
-6. Start a Jupyter Notebook instance, open a new notebook and check out the memory usage in the top right!
+6. Start a Jupyter Notebook instance, open a new notebook and check out the energy consumption in the top right!
   ```bash
   jupyter notebook
   ```
 
 ## TODO
 
-- graphical statistics (one for each benchmark, similar to existing) and relative benchmarks
-- show infos about energy generation (whether the energy was probably generated in a renewable way)
 - show when the notebook ran in the graph
 - support Jetson counters
 - write more documentation (also for benchmark)
