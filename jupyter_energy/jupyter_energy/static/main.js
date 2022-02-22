@@ -114,6 +114,15 @@ define([
                     .append($('<span>').text('.')))
                 .append($('<div>')
                     .addClass('je-menu-section')
+                    .addClass('je-renewable')
+                    .append($('<span>').text('That energy consumption consists of about '))
+                    .append($('<strong>').text('…%').attr('id', 'je-menu-metric-renewable-ratio'))
+                    .append($('<strong>').text(' renewable energy. '))
+                    .append($('<span>').text('Right now, about '))
+                    .append($('<strong>').text('…%').attr('id', 'je-menu-metric-renewable-now'))
+                    .append($('<span>').text(' of the energy in the power grid is from renewable sources.')))
+                .append($('<div>')
+                    .addClass('je-menu-section')
                     .append($('<canvas>').attr('id', 'je-menu-chart')))
                 .append($('<div>')
                     .addClass('je-menu-section')
@@ -128,9 +137,11 @@ define([
                 .append($('<div>')
                     .addClass('je-menu-section')
                     .addClass('je-menu-footer')
-                    .text("The values also contain workload from other programs because there is " +
-                        "no reliable way for the operating system to attribute the energy usage " +
-                        "of PC components with the running processes."))
+                    .html("Energy usage numbers also contain workload from other programs on the " +
+                        "Juypter server because there's no reliable way to directly attribute " +
+                        "the energy usage of PC components with the running processes.<br>" +
+                        "Information about energy generation comes from the European Network of " +
+                        "Transmission System Operators for Electricity."))
         );
         $('head').append($('<style>').html(`
             #je-menu {
@@ -147,6 +158,11 @@ define([
             }
             .je-menu-section {
                 margin-bottom: 1em;
+            }
+            .je-renewable {
+                background: #9FC131;
+                padding: 0.8em;
+                border-radius: .8em;
             }
             #je-menu-comparison-emoji {
                 float: right;
@@ -276,15 +292,39 @@ define([
                 data: data,
                 options: {
                     animation: { duration: 0 },
-                    scales: {
-                        y: { min: 0 }
-                    }
+                    scales: { y: { min: 0 } }
                 },
             });
         } else {
             chart.data = data;
             chart.update();
         }
+
+        // Calculate how much renewable energy was used. JS doesn't really have
+        // higher-level functions like `zip`, so this is kind of messy. Sorry
+        // about that.
+        let totalUsed = 0;
+        let renewableUsed = 0;
+        let currentRenewableRatio = 0;
+        for (let i = 0; i < metrics.usage.all.longTermJoules.length; i++) {
+            const renewablyGenerated = metrics.generation.renewable[i];
+            let totalGenerated = 0;
+            for (const sourceData of Object.values(metrics.generation)) {
+                totalGenerated += sourceData[i];
+            }
+            const renewableRatio = renewablyGenerated / totalGenerated;
+
+            const used = metrics.usage.all.longTermJoules[i];
+            totalUsed += used;
+            renewableUsed += used * renewableRatio;
+
+            if (i == metrics.usage.all.longTermJoules.length - 1) {
+                currentRenewableRatio = renewableRatio;
+            }
+        }
+        const renewableRatio = renewableUsed / totalUsed;
+        $('#je-menu-metric-renewable-ratio').text((renewableRatio * 100).toFixed(1) + '%');
+        $('#je-menu-metric-renewable-now').text((currentRenewableRatio * 100).toFixed(1) + '%');
     };
 
     return {
