@@ -83,10 +83,10 @@ def discover_sources():
     print("Discovering RAPL.")
     rapl_sources = [
         # (internal id, user-visible name, event type)
-        ('all', 'all', 'energy-pkg'),
-        ('cpu', 'CPU', 'energy-cores'),
-        ('ram', 'RAM', 'energy-ram'),
-        ('gpu', 'Integrated GPU', 'energy-gpu'),
+        ('all', 'RAPL, all', 'energy-pkg'),
+        ('cpu', 'RAPL, CPU', 'energy-cores'),
+        ('ram', 'RAPL, RAM', 'energy-ram'),
+        ('gpu', 'RAPL, integrated GPU', 'energy-gpu'),
     ]
     for (id, name, event_type) in rapl_sources:
         try:
@@ -115,7 +115,7 @@ def discover_sources():
             handle = NvmlHandle(gpu_index)
         except MeasureError:
             continue # This GPU doesn't exist.
-        yield NvmlSource(f'nvml{gpu_index}', f'External GPU {gpu_index}', handle)
+        yield NvmlSource(f'nvml{gpu_index}', f'NVML, external Nvidia GPU {gpu_index}', handle)
 
 
 sources = list(discover_sources())

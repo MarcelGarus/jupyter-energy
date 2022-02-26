@@ -38,6 +38,14 @@ def assert_valid(name, obj):
         raise fail('Couldn\'t read consumed energy.')
     if obj == -8:
         raise fail('Used an invalid handle.')
+    if obj == -9:
+        raise fail('Couldn\'t write to MCP.')
+    if obj == -10:
+        raise fail('Couldn\'t read from MCP.')
+    if obj == -11:
+        raise fail('MCP didn\'t send ACK.')
+    if obj == -12:
+        raise fail('MCP checksum failed.')
     raise fail('Shared library returned unknown error code.')
 
 

@@ -10,6 +10,47 @@
 
 #include "utils.c"
 
+// First, here are some utility functions that are used in the rest of this
+// file.
+
+/// Reads the file at the given path and returns its content with trailing
+/// whitespace stripped.
+///
+/// Returns:
+/// positive: A pointer to the content.
+/// 0:        The file couldn't be read. Most likely, the file doesn't exist or
+///           this program doesn't have access.
+///
+/// Ownership: Borrows the path. Gives the caller ownership of the content.
+char *_read_stripped_file(char *path)
+{
+    FILE *file = fopen(path, "rb");
+    if (!file)
+        return 0;
+    char *buffer = malloc(1024);
+    if (!buffer)
+        return 0;
+    size_t length = fread(buffer, 1, 1024, file);
+    fclose(file);
+    buffer[length] = '\0';
+    while (buffer[strlen(buffer) - 1] == '\n' || buffer[strlen(buffer) - 1] == ' ')
+    {
+        buffer[strlen(buffer) - 1] = '\0';
+    }
+    return buffer;
+}
+
+/// Concatenates the three given strings.
+///
+/// Ownership: Borrows the three strings. Gives the caller ownership of the
+/// result.
+char *_concat_strings(char *first, char *second, char *third)
+{
+    char *result = malloc(sizeof(char) * (strlen(first) + strlen(second) + strlen(third) + 1));
+    sprintf(result, "%s%s%s", first, second, third);
+    return result;
+}
+
 /// When users of this library start tracking an energy event, they are given a
 /// pointer to this handle. They should treat it as an opaque token (not look at
 /// the content) and instead only use it for further communication with this

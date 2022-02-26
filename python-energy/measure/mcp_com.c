@@ -6,6 +6,8 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include "utils.c"
+
 enum mcp_types
 {
     f501,
@@ -85,6 +87,11 @@ int init_serial(const char *port, int baud)
 
 int mcp_cmd(unsigned char *cmd, unsigned int cmd_length, unsigned char *reply, int fd)
 {
+    if (fd < 0)
+    {
+        return ERR_INVALID_HANDLE;
+    }
+
     unsigned char buf[80];
     unsigned char command_packet[80];
     int rdlen;
@@ -105,7 +112,7 @@ int mcp_cmd(unsigned char *cmd, unsigned int cmd_length, unsigned char *reply, i
     len = write(fd, command_packet, cmd_length + 3);
     if (len != cmd_length + 3)
     {
-        return -1;
+        return ERR_COULDNT_WRITE_TO_MCP;
     }
     tcdrain(fd);
     while (1)
@@ -113,7 +120,7 @@ int mcp_cmd(unsigned char *cmd, unsigned int cmd_length, unsigned char *reply, i
         rdlen = read(fd, buf, 1);
         if (rdlen == 0)
         {
-            return -1;
+            return ERR_COULDNT_READ_FROM_MCP;
         }
         switch (mcp_state)
         {
@@ -137,7 +144,7 @@ int mcp_cmd(unsigned char *cmd, unsigned int cmd_length, unsigned char *reply, i
             if (len != 11)
             {
                 mcp_state = wait_ack;
-                return -1;
+                return ERR_MCP_DIDNT_SEND_ACK;
             }
             mcp_state = get_data;
             break;
@@ -161,7 +168,7 @@ int mcp_cmd(unsigned char *cmd, unsigned int cmd_length, unsigned char *reply, i
             }
             else
             {
-                return -1;
+                return ERR_MCP_CHECKSUM_FAILED;
             }
             break;
         default:
@@ -185,7 +192,7 @@ int f511_get_power(int *ch1, int *ch2, int fd)
     }
     else
     {
-        return -1;
+        return res;
     }
 }
 

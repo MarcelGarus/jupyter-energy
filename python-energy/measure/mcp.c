@@ -56,7 +56,9 @@ long int _read_device(McpDevice *device, int channel)
 
     if (device->has_read[channel])
     {
-        f511_get_power(&device->data[0], &device->data[1], fd);
+        int result = f511_get_power(&device->data[0], &device->data[1], device->file_descriptor);
+        if (result < 0)
+            return result;
         device->has_read[0] = false;
         device->has_read[1] = false;
     }
@@ -155,7 +157,7 @@ void main()
 {
     printf("Hello, world! Measuring your energy consumption...\n");
 
-    McpDevice *device = create_device("/dev/ttyACM0");
+    McpDevice *device = create_device("/dev/ttyACM1");
     if ((long int)device < 0)
     {
         printf("Error: Device is %ld.\n", (long int)device);
@@ -171,9 +173,9 @@ void main()
     }
     printf("Successfully created handle.\n");
 
-    for (int i = 0; i < 300; i++)
+    for (int i = 0; i < 5; i++)
     {
-        usleep(100000);
+        usleep(1000000);
         double watts = read_handle_in_watts(handle);
         printf("The MCP currently uses %0.3f watts.\n", watts);
     }
