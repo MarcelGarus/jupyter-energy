@@ -3,6 +3,8 @@
 Jupyter Notebooks are a data science tool primarily used for statistics and machine learning, some of the most energy-intensive computing areas.
 To make users of Jupyter Notebooks more aware of their notebooks' energy consumption, this project aims to offer a Jupyter Notebook plugin that informs you of the energy use since the notebook started.
 
+For an overview of the project scope, see [this blog article.](https://mgar.us/jupyter-energy)
+
 Here's a quick overview of the repo folders:
 
 ## rust-energy
